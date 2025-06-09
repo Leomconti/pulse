@@ -1,0 +1,71 @@
+[project]
+name = "pulse"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "fastapi>=0.115.12",
+    "pydantic>=2.11.5",
+    "pydantic-settings>=2.9.1",
+    "redis[hiredis]>=6.2.0",
+    "sqlalchemy>=2.0.41",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.13",
+]
+
+
+[tool.ruff]
+src = ["app"]
+
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "migrations",
+    "build",
+    "dist",
+    "*.html",
+    "*.css",
+    "*.js",
+    "node_modules",
+    ".env",
+]
+line-length = 120
+ignore = [
+    "B017",
+    "B019",
+    "B904",
+    "B905",
+    "C901",
+    "E501",
+    "E722",
+    "E731",
+    "F403",
+    "F541",
+    "F601",
+    "UP007",
+    "UP032",
+    "B008",
+]
+select = [
+    "B",
+    "C4",
+    "C9",
+    "DJ012",
+    "E",
+    "F",
+    "RUF005",
+    "RUF013",
+    "RUF015",
+    "T2",
+    "TRY201",
+    "TRY400",
+    "UP",
+    "W",
+]
