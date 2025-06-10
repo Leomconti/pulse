@@ -41,7 +41,7 @@ app.include_router(health_router, prefix="", tags=["health"])
 app.include_router(instances_router, prefix="/api/v1", tags=["database-connections"])
 app.include_router(query_router, prefix="/api/v1", tags=["sql-queries"])
 app.include_router(mock_data_router, prefix="/api/v1", tags=["mock-data"])
-app.include_router(workflow_router, prefix="/api", tags=["workflows"])
+app.include_router(workflow_router, prefix="/api/v1", tags=["workflows"])
 
 
 logfire.configure(token=logfire_config.LOGFIRE_TOKEN, environment="local")

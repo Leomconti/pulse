@@ -128,6 +128,70 @@ async def start_workflow_htmx(request: Request, query: str = Form(...), schema: 
         )
 
 
+@router.post("/workflows/start-with-connection", response_class=HTMLResponse)
+async def start_workflow_with_connection(request: Request, query: str = Form(...), connection_id: str = Form(...)):
+    """Start workflow for HTMX frontend using a database connection ID to get schema."""
+    try:
+        print(f"DEBUG: Received query: {query}")
+        print(f"DEBUG: Received connection_id: {connection_id}")
+
+        if not query or not connection_id:
+            return templates.TemplateResponse(
+                "partials/workflow_panel.html", {"request": request, "error": "Missing query or connection ID"}
+            )
+
+        # Get schema from database connection
+        from app.models import DatabaseConnection
+        from app.services.redis_ops import get_data
+        from app.services.sql_runner import get_database_schema
+
+        try:
+            connection = await get_data(connection_id, DatabaseConnection)
+            schema_dict = await get_database_schema(connection)
+        except KeyError:
+            return templates.TemplateResponse(
+                "partials/workflow_panel.html", {"request": request, "error": "Database connection not found"}
+            )
+        except Exception as e:
+            print(f"DEBUG: Error getting schema: {e}")
+            return templates.TemplateResponse(
+                "partials/workflow_panel.html",
+                {"request": request, "error": f"Failed to get database schema: {str(e)}"},
+            )
+
+        # Create context immediately and save to Redis
+        import asyncio
+
+        from app.models import Context
+        from app.orchestrator import create_orchestrator
+
+        ctx = Context(query=query, schema=schema_dict)
+        orchestrator = create_orchestrator()
+
+        # Save initial context
+        await orchestrator.save_context(ctx)
+
+        request_id_str = str(ctx.request_id)
+        print(f"DEBUG: Generated request_id: {request_id_str}")
+
+        # Start workflow execution in background (fire and forget)
+        asyncio.create_task(orchestrator.execute_workflow(ctx))
+
+        # Return template immediately with request_id
+        return templates.TemplateResponse(
+            "partials/workflow_panel.html", {"request": request, "request_id": request_id_str}
+        )
+
+    except Exception as e:
+        print(f"DEBUG: Error in start_workflow_with_connection: {e}")
+        import traceback
+
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return templates.TemplateResponse(
+            "partials/workflow_panel.html", {"request": request, "error": f"Failed to start workflow: {str(e)}"}
+        )
+
+
 @router.get("/workflows/{request_id}/status", response_model=WorkflowStatusResponse)
 async def get_status(request_id: str):
     """Get the overall workflow status."""

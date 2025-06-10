@@ -200,3 +200,30 @@ async def test_connection(connection_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to test database connection: {str(e)}"
         )
+
+
+@router.get("/instances/{connection_id}/schema")
+async def get_schema(connection_id: str):
+    """
+    Get the schema information from a database connection.
+    """
+    try:
+        connection = await get_data(connection_id, DatabaseConnection)
+
+        from app.services.sql_runner import get_database_schema
+
+        schema = await get_database_schema(connection)
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"status": "ok", "schema": schema},
+        )
+
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Database connection with ID {connection_id} not found"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get database schema: {str(e)}"
+        )

@@ -109,4 +109,163 @@
       </span>
     </div>
   </div>
+
+  <!-- Final Results Section -->
+  {% set validator_step = steps | selectattr("name", "equalto", "validator") | first %}
+  {% set composer_step = steps | selectattr("name", "equalto", "composer") | first %}
+
+  {% if validator_step and validator_step.status == "done" and composer_step and composer_step.output and composer_step.output.sql_query %}
+  <div class="mt-6 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200 p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+        <i class="fas fa-flag-checkered text-green-600 mr-2"></i>
+        Final SQL Query
+      </h3>
+
+      {% if validator_step.output and validator_step.output.validation and validator_step.output.validation.is_valid %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+        <i class="fas fa-check-circle mr-1"></i>
+        Validated & Ready
+      </span>
+      {% else %}
+      <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+        <i class="fas fa-exclamation-triangle mr-1"></i>
+        Validation Failed
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- SQL Query Display -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium text-gray-700">Generated SQL:</span>
+        <button
+          onclick="copyToClipboard('{{ composer_step.output.sql_query | replace("'", "\\'") | replace('\n', '\\n') }}')"
+          class="text-xs text-blue-600 hover:text-blue-800 underline"
+        >
+          <i class="fas fa-copy mr-1"></i>Copy Query
+        </button>
+      </div>
+      <pre class="bg-gray-50 rounded p-3 text-sm font-mono text-gray-800 overflow-auto custom-scrollbar whitespace-pre-wrap">{{ composer_step.output.sql_query }}</pre>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex items-center space-x-3">
+      {% if validator_step.output and validator_step.output.validation and validator_step.output.validation.is_valid %}
+      <!-- Execute Query Button -->
+      <button
+        onclick="executeQuery('{{ composer_step.output.sql_query | replace("'", "\\'") | replace('\n', '\\n') }}')"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center"
+      >
+        <i class="fas fa-play mr-2"></i>
+        Execute Query
+      </button>
+
+      <!-- Go to Query Tab Button -->
+      <button
+        onclick="goToQueryTab('{{ composer_step.output.sql_query | replace("'", "\\'") | replace('\n', '\\n') }}')"
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium transition-colors flex items-center"
+      >
+        <i class="fas fa-external-link-alt mr-1"></i>
+        Open in Query Tab
+      </button>
+      {% else %}
+      <!-- Query has validation issues -->
+      <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 flex-1">
+        <div class="flex items-start">
+          <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-2"></i>
+          <div>
+            <p class="text-sm font-medium text-yellow-800">Query Validation Issues</p>
+            {% if validator_step.output and validator_step.output.validation and validator_step.output.validation.feedback %}
+            <p class="text-sm text-yellow-700 mt-1">{{ validator_step.output.validation.feedback }}</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Query Execution Results Container -->
+    <div id="query-results" class="hidden mt-4">
+      <!-- Results will be displayed here -->
+    </div>
+  </div>
+  {% endif %}
 </div>
+
+<script>
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+      // Show a brief success message
+      const button = event.target.closest('button');
+      const originalText = button.innerHTML;
+      button.innerHTML = '<i class="fas fa-check mr-1"></i>Copied!';
+      button.className = button.className.replace('text-blue-600', 'text-green-600');
+
+      setTimeout(() => {
+        button.innerHTML = originalText;
+        button.className = button.className.replace('text-green-600', 'text-blue-600');
+      }, 2000);
+    });
+  }
+
+  function goToQueryTab(sqlQuery) {
+    // Store the query in localStorage for the query tab to pick up
+    localStorage.setItem('prefilledQuery', sqlQuery);
+    // Navigate to the query tab
+    window.open('/query', '_blank');
+  }
+
+  function executeQuery(sqlQuery) {
+    const resultsContainer = document.getElementById('query-results');
+    resultsContainer.className = 'mt-4'; // Remove hidden class
+    resultsContainer.innerHTML = `
+      <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <div class="flex items-center mb-3">
+          <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+          <span class="text-sm font-medium text-gray-700">Query Execution</span>
+        </div>
+        <div class="text-sm text-gray-600 mb-3">
+          Direct query execution from workflow is coming soon!
+        </div>
+        <div class="text-sm text-gray-500">
+          For now, use the "Open in Query Tab" button to execute your query in the dedicated query interface.
+        </div>
+      </div>
+    `;
+  }
+
+  // Check if workflow is completed and stop polling
+  document.addEventListener('DOMContentLoaded', function() {
+    checkWorkflowStatus();
+  });
+
+  function checkWorkflowStatus() {
+    // Check if all steps are done or if there's a completed workflow
+    const steps = document.querySelectorAll('[data-step-status]');
+    const completedSteps = document.querySelectorAll('[data-step-status="done"]');
+    const failedSteps = document.querySelectorAll('[data-step-status="failed"]');
+
+    // Check for final results section (indicates completion)
+    const finalResults = document.querySelector('.bg-gradient-to-r');
+
+    if (finalResults || (steps.length > 0 && (completedSteps.length === steps.length || failedSteps.length > 0))) {
+      // Workflow is completed, stop polling
+      const stepsList = document.getElementById('steps-list');
+      if (stepsList && stepsList.parentElement) {
+        // Remove the hx-trigger attribute to stop polling
+        stepsList.parentElement.removeAttribute('hx-trigger');
+        console.log('Workflow completed - polling stopped');
+      }
+    }
+  }
+
+  // Run the check whenever the content is updated
+  if (typeof htmx !== 'undefined') {
+    htmx.on('htmx:afterSwap', function(evt) {
+      if (evt.detail.target.id === 'steps-list') {
+        checkWorkflowStatus();
+      }
+    });
+  }
+</script>
