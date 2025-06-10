@@ -12,6 +12,7 @@ def _make_key(model_name: str, id: str) -> str:
     return f"{model_name}:{id}"
 
 
+
 async def save_data(id: str, data: BaseModel) -> None:
     """Save a Pydantic model instance to Redis."""
     redis = get_redis()
@@ -58,7 +59,6 @@ async def list_ids(model_name: str) -> list[str]:
         ids.append(key[prefix_len:])
 
     return ids
-
 
 async def list_data[T: BaseModel](model: type[T]) -> list[T]:
     """List all instances of a given model type from Redis."""
