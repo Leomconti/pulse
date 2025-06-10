@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Pulse - Database Chat{% endblock %}</title>
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <style>
+      .htmx-indicator {
+        opacity: 0;
+        transition: opacity 200ms ease-in;
+      }
+      .htmx-request .htmx-indicator {
+        opacity: 1;
+      }
+      .htmx-request.htmx-indicator {
+        opacity: 1;
+      }
+
+      /* Custom scrollbar */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b border-gray-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center">
+            <div class="flex-shrink-0">
+              <h1 class="text-xl font-bold text-gray-900">
+                <i class="fas fa-database text-blue-600 mr-2"></i>
+                Pulse
+              </h1>
+            </div>
+            <nav class="ml-8 flex space-x-8">
+              <a href="/" class="text-gray-900 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors">
+                <i class="fas fa-tachometer-alt mr-1"></i>
+                Dashboard
+              </a>
+              <a
+                href="/connections"
+                class="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
+                <i class="fas fa-plug mr-1"></i>
+                Connections
+              </a>
+              <a
+                href="/query"
+                class="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors"
+              >
+                <i class="fas fa-code mr-1"></i>
+                Query
+              </a>
+            </nav>
+          </div>
+          <div class="flex items-center space-x-4">
+            <button
+              hx-post="/mock-data/create-ui"
+              hx-target="#connections-list"
+              hx-swap="outerHTML"
+              class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              <i class="fas fa-plus mr-1"></i>
+              Create Mock Data
+            </button>
+            <button
+              hx-post="/mock-data/cleanup-ui"
+              hx-target="#connections-list"
+              hx-swap="outerHTML"
+              hx-confirm="Are you sure you want to delete all mock databases?"
+              class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              <i class="fas fa-trash mr-1"></i>
+              Cleanup Mock Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">{% block content %}{% endblock %}</main>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+      // Simple toast notification system
+      function showToast(message, type = "info") {
+        const toastContainer = document.getElementById("toast-container");
+        const toast = document.createElement("div");
+
+        const bgColor =
+          type === "success"
+            ? "bg-green-500"
+            : type === "error"
+            ? "bg-red-500"
+            : type === "warning"
+            ? "bg-yellow-500"
+            : "bg-blue-500";
+
+        toast.className = `${bgColor} text-white px-6 py-4 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full opacity-0`;
+        toast.innerHTML = `
+                <div class="flex items-center">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+        toastContainer.appendChild(toast);
+
+        // Animate in
+        setTimeout(() => {
+          toast.classList.remove("translate-x-full", "opacity-0");
+        }, 100);
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+          toast.classList.add("translate-x-full", "opacity-0");
+          setTimeout(() => {
+            if (toast.parentElement) {
+              toast.remove();
+            }
+          }, 300);
+        }, 5000);
+      }
+
+      // Listen for HTMX events to show notifications
+      document.body.addEventListener("htmx:afterSwap", function (event) {
+        const response = event.detail.xhr.responseText;
+
+        // Simple way to detect success/error messages in responses
+        if (response.includes("success")) {
+          showToast("Operation completed successfully!", "success");
+        }
+      });
+
+      // Handle HTMX errors
+      document.body.addEventListener("htmx:responseError", function (event) {
+        showToast("An error occurred. Please try again.", "error");
+      });
+    </script>
+  </body>
+</html>

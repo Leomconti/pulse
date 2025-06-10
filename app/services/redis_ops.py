@@ -16,7 +16,7 @@ def _make_key(model_name: str, id: str) -> str:
     return f"{model_name}:{id}"
 
 
-async def save_data(id: str, data: T) -> None:
+async def save_data(id: str, data: BaseModel) -> None:
     """Save a Pydantic model instance to Redis."""
     redis = get_redis()
     model_name = _get_model_name(type(data))

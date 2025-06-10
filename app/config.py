@@ -23,3 +23,10 @@ class RedisConfig(BaseSettings):
 
 
 cache_config = RedisConfig()  # type: ignore
+
+
+class LogfireConfig(BaseSettings):
+    LOGFIRE_TOKEN: str
+
+
+logfire_config = LogfireConfig()  # type: ignore

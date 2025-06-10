@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 
+import logfire
 from fastapi import FastAPI
 
-from app.config import database_config
+from app.config import database_config, logfire_config
 
 # Import routers
 from app.routes.health import router as health_router
@@ -11,7 +12,7 @@ from app.routes.query import router as query_router
 from app.services.database import ping_db, sessionmanager
 from app.services.redis import ping_redis
 
-lifespan = None  # type: ignore
+# lifespan = None  # type: ignore
 
 # if init_db:
 # Check env for this
@@ -31,6 +32,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Pulse - Database Chat API", lifespan=lifespan)
 
 # Include routers
+# app.include_router(frontend_router, prefix="", tags=["frontend"])  # Commented out temporarily
 app.include_router(health_router, prefix="", tags=["health"])
 app.include_router(instances_router, prefix="/api/v1", tags=["database-connections"])
 app.include_router(query_router, prefix="/api/v1", tags=["sql-queries"])
+# app.include_router(mock_data_router, prefix="/api/v1", tags=["mock-data"])
+
+
+logfire.configure(token=logfire_config.LOGFIRE_TOKEN, environment="local")
+logfire.instrument_fastapi(app)

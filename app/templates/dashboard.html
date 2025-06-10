@@ -1,0 +1,199 @@
+{% extends "base.html" %} {% block title %}Dashboard - Pulse Database Chat{% endblock %} {% block content %}
+<div class="px-4 py-6 sm:px-0">
+  <!-- Header -->
+  <div class="border-b border-gray-200 pb-5 mb-8">
+    <h3 class="text-lg leading-6 font-medium text-gray-900">Database Chat Dashboard</h3>
+    <p class="mt-2 max-w-4xl text-sm text-gray-500">
+      Manage your database connections and execute SQL queries with ease.
+    </p>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <i class="fas fa-database text-blue-500 text-2xl"></i>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Total Connections</dt>
+              <dd class="text-lg font-medium text-gray-900">{{ connections|length }}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <i class="fas fa-bolt text-yellow-500 text-2xl"></i>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Active Connections</dt>
+              <dd class="text-lg font-medium text-gray-900">{{ connections|length }}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+      <div class="p-5">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <i class="fas fa-code text-green-500 text-2xl"></i>
+          </div>
+          <div class="ml-5 w-0 flex-1">
+            <dl>
+              <dt class="text-sm font-medium text-gray-500 truncate">Ready to Query</dt>
+              <dd class="text-lg font-medium text-gray-900">{{ connections|length }}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="bg-white shadow rounded-lg mb-8">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Actions</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <a
+          href="/connections"
+          class="relative group bg-blue-50 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-500 rounded-lg hover:bg-blue-100 transition-colors"
+        >
+          <div>
+            <span class="rounded-lg inline-flex p-3 bg-blue-600 text-white">
+              <i class="fas fa-plus w-6 h-6"></i>
+            </span>
+          </div>
+          <div class="mt-4">
+            <h3 class="text-lg font-medium text-gray-900">Add Connection</h3>
+            <p class="mt-2 text-sm text-gray-500">Connect to a new database instance</p>
+          </div>
+        </a>
+
+        <a
+          href="/query"
+          class="relative group bg-green-50 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-green-500 rounded-lg hover:bg-green-100 transition-colors"
+        >
+          <div>
+            <span class="rounded-lg inline-flex p-3 bg-green-600 text-white">
+              <i class="fas fa-play w-6 h-6"></i>
+            </span>
+          </div>
+          <div class="mt-4">
+            <h3 class="text-lg font-medium text-gray-900">Run Query</h3>
+            <p class="mt-2 text-sm text-gray-500">Execute SQL queries on your databases</p>
+          </div>
+        </a>
+
+        <button
+          hx-post="/mock-data/create-ui"
+          hx-target="#connections-list"
+          hx-swap="outerHTML"
+          class="relative group bg-purple-50 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-purple-500 rounded-lg hover:bg-purple-100 transition-colors text-left"
+        >
+          <div>
+            <span class="rounded-lg inline-flex p-3 bg-purple-600 text-white">
+              <i class="fas fa-magic w-6 h-6"></i>
+            </span>
+          </div>
+          <div class="mt-4">
+            <h3 class="text-lg font-medium text-gray-900">Create Mock Data</h3>
+            <p class="mt-2 text-sm text-gray-500">Generate sample databases for testing</p>
+          </div>
+        </button>
+
+        <a
+          href="/docs"
+          target="_blank"
+          class="relative group bg-gray-50 p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-gray-500 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <div>
+            <span class="rounded-lg inline-flex p-3 bg-gray-600 text-white">
+              <i class="fas fa-book w-6 h-6"></i>
+            </span>
+          </div>
+          <div class="mt-4">
+            <h3 class="text-lg font-medium text-gray-900">API Docs</h3>
+            <p class="mt-2 text-sm text-gray-500">View interactive API documentation</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connections Overview -->
+  <div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg leading-6 font-medium text-gray-900">Database Connections</h3>
+        <a href="/connections" class="text-blue-600 hover:text-blue-500 text-sm font-medium"> View all → </a>
+      </div>
+
+      {% if connections %}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for connection in connections[:6] %}
+        <div class="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+          <div class="flex items-center justify-between">
+            <div>
+              <h4 class="font-medium text-gray-900">{{ connection.name }}</h4>
+              <p class="text-sm text-gray-500">{{ connection.db_type.value|title }}</p>
+              <p class="text-xs text-gray-400">{{ connection.host }}:{{ connection.port }}</p>
+            </div>
+            <div class="flex flex-col items-end space-y-1">
+              <span
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+              >
+                <i class="fas fa-circle text-green-400 mr-1" style="font-size: 6px"></i>
+                Active
+              </span>
+              <a href="/query?connection_id={{ connection.id }}" class="text-blue-600 hover:text-blue-500 text-xs">
+                Query →
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if connections|length > 6 %}
+      <div class="mt-4 text-center">
+        <a href="/connections" class="text-blue-600 hover:text-blue-500 text-sm">
+          View {{ connections|length - 6 }} more connections →
+        </a>
+      </div>
+      {% endif %} {% else %}
+      <div class="text-center py-12">
+        <i class="fas fa-database text-gray-400 text-4xl mb-4"></i>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No connections yet</h3>
+        <p class="text-gray-500 mb-6">Get started by creating your first database connection or using mock data.</p>
+        <div class="space-x-4">
+          <a
+            href="/connections"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          >
+            Add Connection
+          </a>
+          <button
+            hx-post="/mock-data/create-ui"
+            hx-target="#connections-list"
+            hx-swap="outerHTML"
+            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          >
+            Create Mock Data
+          </button>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
