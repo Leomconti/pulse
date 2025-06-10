@@ -1,0 +1,130 @@
+{% extends "base.html" %} {% block title %}Workflow - Pulse{% endblock %} {% block content %}
+<div class="px-4 py-6 sm:px-0">
+  <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">
+        <i class="fas fa-project-diagram text-blue-600 mr-3"></i>
+        Agentic Workflow
+      </h1>
+      <p class="text-gray-600">
+        Start a natural language query workflow and watch the processing in real-time through each agent step.
+      </p>
+    </div>
+
+    <!-- Input Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">
+        <i class="fas fa-play-circle text-green-600 mr-2"></i>
+        Start New Workflow
+      </h2>
+
+      <form
+        id="start-form"
+        class="space-y-4"
+        hx-post="/api/workflows/start-htmx"
+        hx-trigger="submit"
+        hx-target="#workflow-panel"
+        hx-swap="innerHTML"
+        hx-indicator="#start-loading"
+      >
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Natural Language Query </label>
+          <input
+            name="query"
+            type="text"
+            required
+            placeholder="e.g., count all active users where age > 18"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Database Schema (JSON) </label>
+          <textarea
+            name="schema"
+            rows="8"
+            required
+            placeholder='{"tables": {"users": {"columns": ["id", "name", "email"]}}}'
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+          >
+{{ default_schema | safe }}</textarea
+          >
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <i class="fas fa-rocket mr-2"></i>
+            Run Workflow
+          </button>
+
+          <div id="start-loading" class="htmx-indicator flex items-center text-blue-600">
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Starting workflow...
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Workflow Panel -->
+    <div id="workflow-panel" class="min-h-96">
+      <!-- Workflow results will be displayed here -->
+      <div class="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+        <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
+        <p class="text-gray-500 text-lg">No workflow running</p>
+        <p class="text-gray-400 text-sm">Submit a query above to start the workflow</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Set default schema for demo purposes
+  document.addEventListener("DOMContentLoaded", function () {
+    const defaultSchema = {
+      tables: {
+        users: {
+          columns: ["id", "name", "email", "age", "status", "created_at"],
+          types: {
+            id: "int",
+            name: "varchar",
+            email: "varchar",
+            age: "int",
+            status: "varchar",
+            created_at: "timestamp",
+          },
+        },
+        orders: {
+          columns: ["id", "user_id", "product_id", "quantity", "price", "created_at"],
+          types: {
+            id: "int",
+            user_id: "int",
+            product_id: "int",
+            quantity: "int",
+            price: "decimal",
+            created_at: "timestamp",
+          },
+        },
+        products: {
+          columns: ["id", "name", "price", "category", "created_at"],
+          types: {
+            id: "int",
+            name: "varchar",
+            price: "decimal",
+            category: "varchar",
+            created_at: "timestamp",
+          },
+        },
+      },
+    };
+
+    const schemaTextarea = document.querySelector('textarea[name="schema"]');
+    if (schemaTextarea && !schemaTextarea.value.trim()) {
+      schemaTextarea.value = JSON.stringify(defaultSchema, null, 2);
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,112 @@
+<div class="space-y-4">
+  {% for step in steps %}
+  <div class="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+    <!-- Status Indicator -->
+    <div class="flex-shrink-0 mt-1">
+      {% if step.status == 'pending' %}
+      <span class="inline-block w-4 h-4 rounded-full bg-yellow-400 border-2 border-yellow-500"></span>
+      {% elif step.status == 'running' %}
+      <span class="inline-block w-4 h-4 rounded-full bg-blue-400 border-2 border-blue-500 animate-pulse"></span>
+      {% elif step.status == 'done' %}
+      <span class="inline-block w-4 h-4 rounded-full bg-green-400 border-2 border-green-500"></span>
+      {% elif step.status == 'failed' %}
+      <span class="inline-block w-4 h-4 rounded-full bg-red-400 border-2 border-red-500"></span>
+      {% else %}
+      <span class="inline-block w-4 h-4 rounded-full bg-gray-400 border-2 border-gray-500"></span>
+      {% endif %}
+    </div>
+
+    <!-- Step Content -->
+    <div class="flex-1 min-w-0">
+      <!-- Step Header -->
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold text-gray-900 capitalize flex items-center">
+          {% if step.name == 'planner' %}
+          <i class="fas fa-brain text-purple-600 mr-2"></i>
+          {% elif step.name == 'mapper' %}
+          <i class="fas fa-map text-blue-600 mr-2"></i>
+          {% elif step.name == 'composer' %}
+          <i class="fas fa-code text-green-600 mr-2"></i>
+          {% elif step.name == 'validator' %}
+          <i class="fas fa-check-circle text-orange-600 mr-2"></i>
+          {% endif %} {{ step.name | title }} Agent
+        </h3>
+
+        <div class="flex items-center space-x-2 text-xs text-gray-500">
+          {% if step.status == 'running' %}
+          <i class="fas fa-spinner fa-spin"></i>
+          <span>Running...</span>
+          {% elif step.status == 'done' %}
+          <i class="fas fa-check text-green-600"></i>
+          <span>Completed</span>
+          {% elif step.status == 'failed' %}
+          <i class="fas fa-times text-red-600"></i>
+          <span>Failed</span>
+          {% elif step.status == 'pending' %}
+          <i class="fas fa-clock text-yellow-600"></i>
+          <span>Pending</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Step Description -->
+      <div class="text-sm text-gray-600 mb-3">
+        {% if step.name == 'planner' %} Analyzes the natural language query to extract intent, entities, filters, and
+        aggregations. {% elif step.name == 'mapper' %} Maps the extracted entities to actual database tables and columns
+        using the schema. {% elif step.name == 'composer' %} Composes the final SQL query based on the mapped entities
+        and relationships. {% elif step.name == 'validator' %} Validates the generated SQL query for correctness and
+        executability. {% endif %}
+      </div>
+
+      <!-- Step Output -->
+      {% if step.output %}
+      <div class="mt-3">
+        <div class="flex items-center mb-2">
+          <i class="fas fa-file-code text-gray-400 mr-2"></i>
+          <span class="text-sm font-medium text-gray-700">Output:</span>
+        </div>
+        <div class="bg-white border border-gray-300 rounded-md p-3 overflow-auto custom-scrollbar">
+          {% if step.name == 'composer' and step.output.sql_query %}
+          <!-- Special formatting for SQL -->
+          <div class="mb-2">
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Generated SQL:</span>
+          </div>
+          <pre class="text-sm font-mono text-gray-800 whitespace-pre-wrap">{{ step.output.sql_query }}</pre>
+          {% else %}
+          <pre class="text-sm font-mono text-gray-800 whitespace-pre-wrap">{{ step.output | tojsonpretty }}</pre>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Timestamps -->
+      {% if step.started_at or step.finished_at %}
+      <div class="mt-3 flex items-center space-x-4 text-xs text-gray-500">
+        {% if step.started_at %}
+        <div class="flex items-center">
+          <i class="fas fa-play-circle mr-1"></i>
+          <span>Started: {{ step.started_at | timestamp_to_datetime }}</span>
+        </div>
+        {% endif %} {% if step.finished_at %}
+        <div class="flex items-center">
+          <i class="fas fa-stop-circle mr-1"></i>
+          <span>Finished: {{ step.finished_at | timestamp_to_datetime }}</span>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Overall Status -->
+  <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+    <div class="flex items-center">
+      <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+      <span class="text-sm font-medium text-blue-800">
+        Workflow Status: {% set completed_count = steps | selectattr("status", "equalto", "done") | list | length %} {%
+        set total_count = steps | length %} {{ completed_count }} of {{ total_count }} steps completed
+      </span>
+    </div>
+  </div>
+</div>

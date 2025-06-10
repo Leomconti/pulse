@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Optional
 
@@ -22,6 +23,16 @@ def timestamp_to_date(timestamp: float) -> str:
         return "Invalid date"
 
 
+# Add custom filter to convert Unix timestamp to readable datetime
+def timestamp_to_datetime(timestamp: float) -> str:
+    """Convert Unix timestamp to readable datetime format."""
+    try:
+        dt = datetime.fromtimestamp(timestamp)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError, OSError):
+        return "Invalid datetime"
+
+
 # Add pluralize filter for proper pluralization
 def pluralize_filter(count: int, singular: str = "", plural: str = "s") -> str:
     """Add 's' for pluralization or custom singular/plural forms."""
@@ -30,8 +41,19 @@ def pluralize_filter(count: int, singular: str = "", plural: str = "s") -> str:
     return plural
 
 
+# Add JSON pretty print filter
+def tojsonpretty_filter(value) -> str:
+    """Convert value to pretty printed JSON."""
+    try:
+        return json.dumps(value, indent=2, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(value)
+
+
 templates.env.filters["timestamp_to_date"] = timestamp_to_date
+templates.env.filters["timestamp_to_datetime"] = timestamp_to_datetime
 templates.env.filters["pluralize"] = pluralize_filter
+templates.env.filters["tojsonpretty"] = tojsonpretty_filter
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -42,6 +64,131 @@ async def dashboard(request: Request):
         return templates.TemplateResponse("dashboard.html", {"request": request, "connections": connections})
     except Exception as e:
         return templates.TemplateResponse("dashboard.html", {"request": request, "connections": [], "error": str(e)})
+
+
+@router.get("/workflow", response_class=HTMLResponse)
+async def workflow_page(request: Request):
+    """Workflow page for agentic workflow execution."""
+    return templates.TemplateResponse("workflow.html", {"request": request})
+
+
+@router.post("/workflow/start-ui", response_class=HTMLResponse)
+async def start_workflow_ui(request: Request, query: str = Form(...), schema: str = Form(...)):
+    """Start workflow from UI form and return the workflow panel."""
+    try:
+        import json
+
+        from app.orchestrator import execute_workflow
+
+        # Parse the schema JSON
+        try:
+            schema_dict = json.loads(schema)
+        except json.JSONDecodeError:
+            return templates.TemplateResponse(
+                "partials/workflow_panel.html", {"request": request, "error": "Invalid JSON schema format"}
+            )
+
+        # Start the workflow
+        ctx = await execute_workflow(query=query, schema=schema_dict)
+
+        return templates.TemplateResponse(
+            "partials/workflow_panel.html", {"request": request, "request_id": str(ctx.request_id)}
+        )
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "partials/workflow_panel.html", {"request": request, "error": f"Failed to start workflow: {str(e)}"}
+        )
+
+
+@router.get("/workflow/{request_id}/steps-ui", response_class=HTMLResponse)
+async def get_workflow_steps_ui(request: Request, request_id: str):
+    """Get workflow steps for UI display."""
+    try:
+        from app.orchestrator import get_workflow_status
+
+        status_info = await get_workflow_status(request_id)
+        if not status_info:
+            return templates.TemplateResponse(
+                "partials/workflow_steps.html", {"request": request, "steps": [], "error": "Workflow not found"}
+            )
+
+        # Create steps data for template
+        step_names = ["planner", "mapper", "composer", "validator"]
+        steps = []
+
+        current_step = status_info.get("current_step")
+        workflow_status = status_info.get("status", "pending")
+
+        for step_name in step_names:
+            step_status = _determine_step_status_ui(step_name, current_step, workflow_status, status_info)
+            output = _get_step_output_ui(step_name, status_info)
+
+            # Use workflow timestamps for simplicity
+            started_at = status_info.get("created_at") if step_status in ["running", "done"] else None
+            finished_at = status_info.get("updated_at") if step_status == "done" else None
+
+            steps.append(
+                {
+                    "name": step_name,
+                    "status": step_status,
+                    "output": output,
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                }
+            )
+
+        return templates.TemplateResponse("partials/workflow_steps.html", {"request": request, "steps": steps})
+
+    except Exception as e:
+        return templates.TemplateResponse(
+            "partials/workflow_steps.html",
+            {"request": request, "steps": [], "error": f"Failed to get workflow steps: {str(e)}"},
+        )
+
+
+def _determine_step_status_ui(
+    step_name: str, current_step: Optional[str], workflow_status: str, status_info: dict
+) -> str:
+    """Determine the status of an individual step for UI."""
+    step_order = ["planner", "mapper", "composer", "validator"]
+
+    if workflow_status == "failed":
+        return "failed"
+
+    if not current_step:
+        return "pending"
+
+    current_index = step_order.index(current_step) if current_step in step_order else -1
+    step_index = step_order.index(step_name)
+
+    if step_index > current_index:
+        return "pending"
+    elif step_index == current_index:
+        if workflow_status in ["running", "retrying"]:
+            return "running"
+        elif workflow_status == "completed":
+            return "done"
+        else:
+            return "pending"
+    else:  # step_index < current_index
+        return "done"
+
+
+def _get_step_output_ui(step_name: str, status_info: dict) -> Optional[dict]:
+    """Get the output for a specific step for UI."""
+    if step_name == "planner" and status_info.get("has_planner_output"):
+        return {"intent": "Processing query...", "status": "completed"}
+    elif step_name == "mapper" and status_info.get("has_mapper_output"):
+        return {"mapped_entities": "Entities mapped to schema", "status": "completed"}
+    elif step_name == "composer" and status_info.get("has_composer_output"):
+        sql_query = status_info.get("sql_query")
+        return {"sql_query": sql_query} if sql_query else None
+    elif step_name == "validator" and status_info.get("has_validator_output"):
+        is_valid = status_info.get("is_valid")
+        return {"validation": {"is_valid": is_valid}} if is_valid is not None else None
+
+    return None
 
 
 @router.get("/connections", response_class=HTMLResponse)

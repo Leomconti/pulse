@@ -1,17 +1,10 @@
-#!/usr/bin/env python3
-"""
-Test script for the agentic workflow system.
-
-This script demonstrates how to use the orchestrator and agents
-to process natural language queries into SQL.
-"""
-
+import asyncio
 import json
 
 from app.orchestrator import execute_workflow, get_workflow_status
 
 
-def test_basic_workflow():
+async def test_basic_workflow():
     """Test a basic workflow execution."""
     print("=" * 60)
     print("TEST: Basic Workflow Execution")
@@ -64,7 +57,7 @@ def test_basic_workflow():
 
     # Execute workflow
     try:
-        result_ctx = execute_workflow(query, schema, user_id="test_user")
+        result_ctx = await execute_workflow(query, schema, user_id="test_user")
 
         print(f"\nWorkflow completed!")
         print(f"Request ID: {result_ctx.request_id}")
@@ -110,7 +103,7 @@ def test_basic_workflow():
         return None
 
 
-def test_workflow_with_filters():
+async def test_workflow_with_filters():
     """Test workflow with filters that might trigger retry."""
     print("\n" + "=" * 60)
     print("TEST: Workflow with Filters (Complex Query)")
@@ -138,7 +131,7 @@ def test_workflow_with_filters():
     print("\nExecuting workflow...")
 
     try:
-        result_ctx = execute_workflow(query, schema, user_id="test_user_2")
+        result_ctx = await execute_workflow(query, schema, user_id="test_user_2")
 
         print(f"\nWorkflow completed!")
         print(f"Status: {result_ctx.status}")
@@ -159,7 +152,7 @@ def test_workflow_with_filters():
         return None
 
 
-def test_status_retrieval():
+async def test_status_retrieval():
     """Test workflow status retrieval."""
     print("\n" + "=" * 60)
     print("TEST: Status Retrieval")
@@ -169,13 +162,13 @@ def test_status_retrieval():
     schema = {"tables": {"users": {"columns": ["id", "name"]}}}
     query = "count users"
 
-    result_ctx = execute_workflow(query, schema)
+    result_ctx = await execute_workflow(query, schema)
 
     if result_ctx:
         print(f"Executed workflow with request_id: {result_ctx.request_id}")
 
         # Retrieve status
-        status = get_workflow_status(str(result_ctx.request_id))
+        status = await get_workflow_status(str(result_ctx.request_id))
 
         if status:
             print("\nWorkflow Status:")
@@ -187,19 +180,19 @@ def test_status_retrieval():
     return result_ctx
 
 
-def main():
+async def main():
     """Main test function."""
     print("Starting Agentic Workflow Tests")
     print("=" * 60)
 
     # Test 1: Basic workflow
-    ctx1 = test_basic_workflow()
+    ctx1 = await test_basic_workflow()
 
     # Test 2: Complex query with filters
-    ctx2 = test_workflow_with_filters()
+    ctx2 = await test_workflow_with_filters()
 
     # Test 3: Status retrieval
-    ctx3 = test_status_retrieval()
+    ctx3 = await test_status_retrieval()
 
     print("\n" + "=" * 60)
     print("All tests completed!")
@@ -215,4 +208,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

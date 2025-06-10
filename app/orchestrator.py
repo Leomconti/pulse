@@ -1,7 +1,9 @@
+import asyncio
 import importlib
+import inspect
 import json
-from collections.abc import Callable
-from typing import Optional
+from collections.abc import Awaitable, Callable
+from typing import Optional, Union
 
 import logfire
 
@@ -28,8 +30,8 @@ class WorkflowOrchestrator:
             "validator": [],  # End node
         }
 
-        # Agent registry - maps agent names to their functions
-        self.agents: dict[str, Callable[[Context], Context]] = {}
+        # Agent registry - maps agent names to their functions (sync or async)
+        self.agents: dict[str, Union[Callable[[Context], Context], Callable[[Context], Awaitable[Context]]]] = {}
         self._register_agents()
 
     def _register_agents(self):
@@ -68,16 +70,16 @@ class WorkflowOrchestrator:
 
         return True
 
-    def save_context(self, ctx: Context):
+    async def save_context(self, ctx: Context):
         """Save context to Redis."""
         key = f"workflow:{ctx.request_id}"
         data = ctx.to_dict()
-        self.redis_client.setex(key, 3600, json.dumps(data))  # 1 hour TTL
+        await self.redis_client.setex(key, 3600, json.dumps(data))  # 1 hour TTL
 
-    def load_context(self, request_id: str) -> Optional[Context]:
+    async def load_context(self, request_id: str) -> Optional[Context]:
         """Load context from Redis."""
         key = f"workflow:{request_id}"
-        data = self.redis_client.get(key)
+        data = await self.redis_client.get(key)
 
         if data:
             if isinstance(data, bytes):
@@ -87,7 +89,7 @@ class WorkflowOrchestrator:
             return Context.from_dict(json.loads(data_str))
         return None
 
-    def execute_agent(self, ctx: Context, agent_name: str) -> Context:
+    async def execute_agent(self, ctx: Context, agent_name: str) -> Context:
         """Execute a single agent."""
         if agent_name not in self.agents:
             raise ValueError(f"Agent {agent_name} not found")
@@ -101,12 +103,25 @@ class WorkflowOrchestrator:
             ]
             raise ValueError(f"Missing requirements for {agent_name}: {missing_reqs}")
 
-        # Execute the agent
+        # Add sleep to simulate processing time for better UX
+        logfire.info(f"Starting {agent_name} agent processing...")
+        await asyncio.sleep(2)  # 2 second delay for each agent
+
+        # Execute the agent (handle both sync and async functions)
         agent_func = self.agents[agent_name]
-        updated_ctx = agent_func(ctx)
+
+        # Check if the agent function is async
+        if inspect.iscoroutinefunction(agent_func):
+            updated_ctx = await agent_func(ctx)
+        else:
+            updated_ctx = agent_func(ctx)
+
+        # Ensure we have a Context object
+        if not isinstance(updated_ctx, Context):
+            raise ValueError(f"Agent {agent_name} must return a Context object")
 
         # Save context after each step
-        self.save_context(updated_ctx)
+        await self.save_context(updated_ctx)
 
         return updated_ctx
 
@@ -125,7 +140,7 @@ class WorkflowOrchestrator:
         """Get the path of agents to re-execute during retry (composer -> validator)."""
         return ["composer", "validator"]
 
-    def execute_workflow(self, ctx: Context) -> Context:
+    async def execute_workflow(self, ctx: Context) -> Context:
         """
         Execute the complete workflow.
 
@@ -135,7 +150,7 @@ class WorkflowOrchestrator:
 
         # Set initial status
         ctx.status = WorkflowStatus.RUNNING
-        self.save_context(ctx)
+        await self.save_context(ctx)
 
         try:
             # Execute the main workflow path
@@ -143,7 +158,9 @@ class WorkflowOrchestrator:
 
             for agent_name in execution_order:
                 logfire.info(f"Executing agent: {agent_name}")
-                ctx = self.execute_agent(ctx, agent_name)
+                ctx.current_step = agent_name
+                await self.save_context(ctx)
+                ctx = await self.execute_agent(ctx, agent_name)
                 logfire.info(f"Completed agent: {agent_name}")
 
             # Handle feedback loop if validation failed
@@ -151,13 +168,15 @@ class WorkflowOrchestrator:
                 logfire.info(f"Validation failed, retrying... (attempt {ctx.retry_count + 1})")
                 ctx.retry_count += 1
                 ctx.status = WorkflowStatus.RETRYING
-                self.save_context(ctx)
+                await self.save_context(ctx)
 
                 # Execute only the retry path (composer -> validator)
                 retry_path = self.get_retry_path()
                 for agent_name in retry_path:
                     logfire.info(f"Re-executing agent: {agent_name}")
-                    ctx = self.execute_agent(ctx, agent_name)
+                    ctx.current_step = agent_name
+                    await self.save_context(ctx)
+                    ctx = await self.execute_agent(ctx, agent_name)
                     logfire.info(f"Re-completed agent: {agent_name}")
 
             # Set final status
@@ -176,7 +195,7 @@ class WorkflowOrchestrator:
         finally:
             # Always save final context
             ctx.update_timestamp()
-            self.save_context(ctx)
+            await self.save_context(ctx)
 
         return ctx
 
@@ -186,9 +205,9 @@ class WorkflowOrchestrator:
         # In a more complex scenario, you'd implement topological sorting
         return ["planner", "mapper", "composer", "validator"]
 
-    def get_workflow_status(self, request_id: str) -> Optional[dict]:
+    async def get_workflow_status(self, request_id: str) -> Optional[dict]:
         """Get the current status of a workflow."""
-        ctx = self.load_context(request_id)
+        ctx = await self.load_context(request_id)
         if not ctx:
             return None
 
@@ -215,7 +234,7 @@ def create_orchestrator() -> WorkflowOrchestrator:
     return WorkflowOrchestrator()
 
 
-def execute_workflow(query: str, schema: dict, user_id: Optional[str] = None) -> Context:
+async def execute_workflow(query: str, schema: dict, user_id: Optional[str] = None) -> Context:
     """Execute a complete workflow with the given query and schema."""
     orchestrator = create_orchestrator()
 
@@ -227,10 +246,10 @@ def execute_workflow(query: str, schema: dict, user_id: Optional[str] = None) ->
     )
 
     # Execute workflow
-    return orchestrator.execute_workflow(ctx)
+    return await orchestrator.execute_workflow(ctx)
 
 
-def get_workflow_status(request_id: str) -> Optional[dict]:
+async def get_workflow_status(request_id: str) -> Optional[dict]:
     """Get the status of a workflow by request ID."""
     orchestrator = create_orchestrator()
-    return orchestrator.get_workflow_status(request_id)
+    return await orchestrator.get_workflow_status(request_id)

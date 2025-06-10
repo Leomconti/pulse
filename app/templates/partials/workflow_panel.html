@@ -1,0 +1,21 @@
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-xl font-semibold text-gray-900">
+      <i class="fas fa-cogs text-blue-600 mr-2"></i>
+      Workflow Progress
+    </h2>
+    <div class="flex items-center space-x-3">
+      <span class="text-sm text-gray-500">Request ID:</span>
+      <code class="text-xs bg-gray-100 px-2 py-1 rounded font-mono">{{ request_id }}</code>
+    </div>
+  </div>
+
+  <!-- Steps Container -->
+  <div id="steps-list" hx-get="/api/workflows/{{ request_id }}/steps-htmx" hx-trigger="every 2s" hx-swap="innerHTML">
+    <!-- Initial loading state -->
+    <div class="text-center py-8">
+      <i class="fas fa-spinner fa-spin text-blue-600 text-2xl mb-3"></i>
+      <p class="text-gray-600">Loading workflow steps...</p>
+    </div>
+  </div>
+</div>

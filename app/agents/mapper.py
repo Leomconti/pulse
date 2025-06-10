@@ -4,7 +4,7 @@ from app.models import Context, MappedAggregation, MappedEntity, MappedFilter, M
 requires: list[str] = ["planner_output"]
 
 
-def mapper_agent(ctx: Context) -> Context:
+async def mapper_agent(ctx: Context) -> Context:
     """
     Mapper agent: Map planner output to database schema.
 

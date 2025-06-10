@@ -4,7 +4,7 @@ from app.models import Context, ValidationResult, ValidatorOutput
 requires: list[str] = ["composer_output"]
 
 
-def validator_agent(ctx: Context) -> Context:
+async def validator_agent(ctx: Context) -> Context:
     """
     Validator agent: Validate SQL query and provide feedback.
 

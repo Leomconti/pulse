@@ -4,7 +4,7 @@ from app.models import ComposerOutput, Context
 requires: list[str] = ["mapper_output"]
 
 
-def composer_agent(ctx: Context) -> Context:
+async def composer_agent(ctx: Context) -> Context:
     """
     Composer agent: Construct SQL query from mapper output.
 

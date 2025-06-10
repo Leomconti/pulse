@@ -4,7 +4,7 @@ from app.models import Aggregation, Context, Entity, Filter, PlannerOutput
 requires: list[str] = []  # Planner is the first agent, no dependencies
 
 
-def planner_agent(ctx: Context) -> Context:
+async def planner_agent(ctx: Context) -> Context:
     """
     Planner agent: Parse natural language input into structured representation.
 
