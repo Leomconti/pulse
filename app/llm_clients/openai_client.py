@@ -8,17 +8,19 @@ class OpenAIClient:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=llm_config.OPENAI_API_KEY)
 
-    async def call(self, model: str, prompt: str) -> str:
+    async def call(self, model: str, system_prompt: str, user_prompt: str) -> str:
         response = await self.client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         )
         return response.choices[0].message.content or ""
 
-    async def call_structured[T: BaseModel](self, model: str, prompt: str, output_model: type[T]) -> T:
+    async def call_structured[T: BaseModel](
+        self, model: str, system_prompt: str, user_prompt: str, output_model: type[T]
+    ) -> T:
         openai_response: ParsedChatCompletion = await self.client.beta.chat.completions.parse(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
             response_format=output_model,
         )
 
