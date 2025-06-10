@@ -159,8 +159,12 @@ async def test_database_connection(connection: DatabaseConnection) -> bool:
         True if connection is successful, False otherwise
     """
     try:
-        # Use a simple query to test the connection
-        result = await run_sql_query(connection.id, "SELECT 1 as test_connection")
+        # Test the connection directly without relying on Redis
+        if connection.db_type.value == "postgresql":
+            result = await _execute_postgresql_query(connection, "SELECT 1 as test_connection")
+        else:
+            result = await _execute_generic_query(connection, "SELECT 1 as test_connection")
+
         return result.row_count == 1
-    except (ConnectionNotFoundError, SQLExecutionError):
+    except (SQLExecutionError, Exception):
         return False

@@ -39,7 +39,15 @@ class DatabaseConnection(BaseModel):
         elif self.db_type == DatabaseType.MYSQL:
             return f"mysql+aiomysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
         elif self.db_type == DatabaseType.SQLITE:
-            return f"sqlite+aiosqlite:///{self.database}"
+            # For SQLite, handle special cases like :memory: and file paths
+            if self.database == ":memory:":
+                return "sqlite+aiosqlite:///:memory:"
+            elif self.database.startswith("/") or self.database.startswith("./"):
+                # Absolute or relative path
+                return f"sqlite+aiosqlite:///{self.database}"
+            else:
+                # Relative filename
+                return f"sqlite+aiosqlite:///./{self.database}"
         else:
             raise ValueError(f"Unsupported database type: {self.db_type}")
 

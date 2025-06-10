@@ -62,14 +62,14 @@ async def test_api():
         print("🧪 Testing Database Chat API")
         print("=" * 40)
 
-        # Test 1: Create a SQLite connection (in-memory)
+        # Test 1: Create a SQLite connection (file-based)
         print("\n1. Creating SQLite connection...")
         connection_data = {
             "name": "Test SQLite DB",
             "db_type": "sqlite",
             "host": "localhost",
             "port": 5432,  # Not used for SQLite
-            "database": ":memory:",
+            "database": "./test_db.sqlite",
             "username": "test",
             "password": "test",
         }

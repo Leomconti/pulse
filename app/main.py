@@ -1,3 +1,36 @@
-from app import init_app
+from contextlib import asynccontextmanager
 
-server = init_app()
+from fastapi import FastAPI
+
+from app.config import database_config
+
+# Import routers
+from app.routes.health import router as health_router
+from app.routes.instances import router as instances_router
+from app.routes.query import router as query_router
+from app.services.database import ping_db, sessionmanager
+from app.services.redis import ping_redis
+
+lifespan = None  # type: ignore
+
+# if init_db:
+# Check env for this
+sessionmanager.init(database_config.get_db_url())
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ping to ensure they are up and connections open
+    await ping_db()
+    await ping_redis()
+    yield
+    if sessionmanager._engine is not None:
+        await sessionmanager.close()
+
+
+app = FastAPI(title="Pulse - Database Chat API", lifespan=lifespan)
+
+# Include routers
+app.include_router(health_router, prefix="", tags=["health"])
+app.include_router(instances_router, prefix="/api/v1", tags=["database-connections"])
+app.include_router(query_router, prefix="/api/v1", tags=["sql-queries"])
