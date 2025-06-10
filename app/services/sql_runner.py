@@ -211,3 +211,126 @@ async def test_database_connection(connection: DatabaseConnection) -> bool:
         return result.row_count == 1
     except (SQLExecutionError, Exception):
         return False
+
+
+async def get_database_schema(connection: DatabaseConnection) -> dict:
+    """
+    Get the database schema information.
+
+    Args:
+        connection: The database connection to get schema from
+
+    Returns:
+        Dictionary containing schema information with tables and columns
+
+    Raises:
+        SQLExecutionError: If there's an error getting schema information
+    """
+    try:
+        schema = {"tables": {}}
+
+        if connection.db_type.value == "postgresql":
+            # Get tables and their columns for PostgreSQL
+            tables_query = """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                ORDER BY table_name;
+            """
+            tables_result = await _execute_postgresql_query(connection, tables_query)
+
+            for table_row in tables_result.rows:
+                table_name = table_row[0]
+
+                # Get columns for this table
+                columns_query = f"""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = '{table_name}'
+                    ORDER BY ordinal_position;
+                """
+                columns_result = await _execute_postgresql_query(connection, columns_query)
+
+                schema["tables"][table_name] = {"columns": []}
+
+                for col_row in columns_result.rows:
+                    schema["tables"][table_name]["columns"].append(
+                        {"name": col_row[0], "type": col_row[1], "nullable": col_row[2] == "YES", "default": col_row[3]}
+                    )
+
+        elif connection.db_type.value == "sqlite":
+            # Get tables for SQLite
+            tables_query = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+            tables_result = await _execute_generic_query(connection, tables_query)
+
+            for table_row in tables_result.rows:
+                table_name = table_row[0]
+
+                # Get columns for this table using PRAGMA
+                columns_query = f"PRAGMA table_info({table_name});"
+                columns_result = await _execute_generic_query(connection, columns_query)
+
+                schema["tables"][table_name] = {"columns": []}
+
+                for col_row in columns_result.rows:
+                    # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+                    schema["tables"][table_name]["columns"].append(
+                        {
+                            "name": col_row[1],
+                            "type": col_row[2],
+                            "nullable": not bool(col_row[3]),
+                            "default": col_row[4],
+                        }
+                    )
+
+        elif connection.db_type.value == "mysql":
+            # Get tables for MySQL
+            tables_query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{connection.database}' ORDER BY table_name;"
+            tables_result = await _execute_generic_query(connection, tables_query)
+
+            for table_row in tables_result.rows:
+                table_name = table_row[0]
+
+                # Get columns for this table
+                columns_query = f"""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = '{connection.database}' AND table_name = '{table_name}'
+                    ORDER BY ordinal_position;
+                """
+                columns_result = await _execute_generic_query(connection, columns_query)
+
+                schema["tables"][table_name] = {"columns": []}
+
+                for col_row in columns_result.rows:
+                    schema["tables"][table_name]["columns"].append(
+                        {"name": col_row[0], "type": col_row[1], "nullable": col_row[2] == "YES", "default": col_row[3]}
+                    )
+
+        else:
+            # Generic approach for other databases
+            tables_query = f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{connection.database}' ORDER BY table_name;"
+            tables_result = await _execute_generic_query(connection, tables_query)
+
+            for table_row in tables_result.rows:
+                table_name = table_row[0]
+
+                columns_query = f"""
+                    SELECT column_name, data_type, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = '{connection.database}' AND table_name = '{table_name}'
+                    ORDER BY ordinal_position;
+                """
+                columns_result = await _execute_generic_query(connection, columns_query)
+
+                schema["tables"][table_name] = {"columns": []}
+
+                for col_row in columns_result.rows:
+                    schema["tables"][table_name]["columns"].append(
+                        {"name": col_row[0], "type": col_row[1], "nullable": col_row[2] == "YES", "default": col_row[3]}
+                    )
+
+        return schema
+
+    except Exception as e:
+        raise SQLExecutionError(f"Failed to get database schema: {str(e)}")

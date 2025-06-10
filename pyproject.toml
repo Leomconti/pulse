@@ -64,6 +64,7 @@ ignore = [
     "UP007",
     "UP032",
     "B008",
+    "T201", # prints
 ]
 select = [
     "B",

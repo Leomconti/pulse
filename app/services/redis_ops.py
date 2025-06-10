@@ -1,9 +1,5 @@
-from typing import TypeVar
-
 from app.services.redis import get_redis
 from pydantic import BaseModel
-
-T = TypeVar("T", bound=BaseModel)
 
 
 def _get_model_name(model: type[BaseModel]) -> str:
@@ -27,7 +23,7 @@ async def save_data(id: str, data: BaseModel) -> None:
     await redis.set(key, json_data)
 
 
-async def get_data(id: str, model: type[T]) -> T:
+async def get_data[T: BaseModel](id: str, model: type[T]) -> T:
     """Retrieve a Pydantic model instance from Redis."""
     redis = get_redis()
     model_name = _get_model_name(model)
@@ -64,7 +60,7 @@ async def list_ids(model_name: str) -> list[str]:
     return ids
 
 
-async def list_data(model: type[T]) -> list[T]:
+async def list_data[T: BaseModel](model: type[T]) -> list[T]:
     """List all instances of a given model type from Redis."""
     model_name = _get_model_name(model)
     ids = await list_ids(model_name)

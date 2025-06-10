@@ -1,0 +1,426 @@
+{% extends "base.html" %} {% block title %}Workflow - Pulse{% endblock %} {% block content %}
+<div class="px-4 py-6 sm:px-0">
+  <div class="border-4 border-dashed border-gray-200 rounded-lg p-6">
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">
+        <i class="fas fa-project-diagram text-blue-600 mr-3"></i>
+        Agentic Workflow
+      </h1>
+      <p class="text-gray-600">
+        Start a natural language query workflow and watch the processing in real-time through each agent step.
+      </p>
+    </div>
+
+    <!-- Input Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">
+        <i class="fas fa-play-circle text-green-600 mr-2"></i>
+        Start New Workflow
+      </h2>
+
+      <!-- Schema Source Toggle -->
+      <div class="mb-6">
+        <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+          <button
+            type="button"
+            id="manual-tab"
+            class="px-4 py-2 text-sm font-medium rounded-md transition-colors bg-white text-blue-600 shadow-sm"
+            onclick="switchSchemaSource('manual')"
+          >
+            <i class="fas fa-code mr-2"></i>Manual Schema
+          </button>
+          <button
+            type="button"
+            id="connection-tab"
+            class="px-4 py-2 text-sm font-medium rounded-md transition-colors text-gray-600 hover:text-gray-900"
+            onclick="switchSchemaSource('connection')"
+          >
+            <i class="fas fa-database mr-2"></i>Database Connection
+          </button>
+        </div>
+      </div>
+
+      <!-- Manual Schema Form -->
+      <form
+        id="manual-form"
+        class="space-y-4"
+        hx-post="/api/v1/workflows/start-htmx"
+        hx-trigger="submit"
+        hx-target="#workflow-panel"
+        hx-swap="innerHTML"
+        hx-indicator="#start-loading"
+      >
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Natural Language Query </label>
+          <input
+            name="query"
+            type="text"
+            required
+            placeholder="e.g., count all active users where age > 18"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Database Schema (JSON) </label>
+          <textarea
+            name="schema"
+            rows="8"
+            required
+            placeholder='{"tables": {"users": {"columns": ["id", "name", "email"]}}}'
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+          >
+{{ default_schema | safe }}</textarea
+          >
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <i class="fas fa-rocket mr-2"></i>
+            Run Workflow
+          </button>
+
+          <div id="start-loading" class="htmx-indicator flex items-center text-blue-600">
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Starting workflow...
+          </div>
+        </div>
+      </form>
+
+      <!-- Connection-based Schema Form -->
+      <form
+        id="connection-form"
+        class="space-y-4 hidden"
+        hx-post="/api/v1/workflows/start-with-connection"
+        hx-trigger="submit"
+        hx-target="#workflow-panel"
+        hx-swap="innerHTML"
+        hx-indicator="#start-loading-connection"
+      >
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Natural Language Query </label>
+          <input
+            name="query"
+            type="text"
+            required
+            placeholder="e.g., count all active users where age > 18"
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Database Connection </label>
+          <select
+            name="connection_id"
+            id="connection-select"
+            required
+            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Select a database connection...</option>
+          </select>
+          <div class="mt-2 flex items-center space-x-2">
+            <button
+              type="button"
+              id="refresh-connections"
+              class="text-sm text-blue-600 hover:text-blue-800 underline"
+              onclick="loadDatabaseConnections()"
+            >
+              <i class="fas fa-refresh mr-1"></i>Refresh Connections
+            </button>
+            <button
+              type="button"
+              id="preview-schema"
+              class="text-sm text-green-600 hover:text-green-800 underline"
+              onclick="previewSchema()"
+              disabled
+            >
+              <i class="fas fa-eye mr-1"></i>Preview Schema
+            </button>
+          </div>
+        </div>
+
+        <!-- Schema Preview -->
+        <div id="schema-preview" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-2"> Schema Preview </label>
+          <div class="bg-gray-50 border border-gray-200 rounded-md p-4 max-h-96 overflow-y-auto">
+            <div id="schema-content" class="space-y-6"></div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <i class="fas fa-rocket mr-2"></i>
+            Run Workflow
+          </button>
+
+          <div id="start-loading-connection" class="htmx-indicator flex items-center text-blue-600">
+            <i class="fas fa-spinner fa-spin mr-2"></i>
+            Starting workflow...
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Workflow Panel -->
+    <div id="workflow-panel" class="min-h-96">
+      <!-- Workflow results will be displayed here -->
+      <div class="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+        <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
+        <p class="text-gray-500 text-lg">No workflow running</p>
+        <p class="text-gray-400 text-sm">Submit a query above to start the workflow</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Schema source management
+  function switchSchemaSource(source) {
+    const manualTab = document.getElementById("manual-tab");
+    const connectionTab = document.getElementById("connection-tab");
+    const manualForm = document.getElementById("manual-form");
+    const connectionForm = document.getElementById("connection-form");
+
+    if (source === "manual") {
+      // Update tab styling
+      manualTab.className =
+        "px-4 py-2 text-sm font-medium rounded-md transition-colors bg-white text-blue-600 shadow-sm";
+      connectionTab.className =
+        "px-4 py-2 text-sm font-medium rounded-md transition-colors text-gray-600 hover:text-gray-900";
+
+      // Show/hide forms
+      manualForm.classList.remove("hidden");
+      connectionForm.classList.add("hidden");
+    } else if (source === "connection") {
+      // Update tab styling
+      connectionTab.className =
+        "px-4 py-2 text-sm font-medium rounded-md transition-colors bg-white text-blue-600 shadow-sm";
+      manualTab.className =
+        "px-4 py-2 text-sm font-medium rounded-md transition-colors text-gray-600 hover:text-gray-900";
+
+      // Show/hide forms
+      connectionForm.classList.remove("hidden");
+      manualForm.classList.add("hidden");
+
+      // Load connections when switching to connection mode
+      loadDatabaseConnections();
+    }
+  }
+
+  // Load available database connections
+  async function loadDatabaseConnections() {
+    try {
+      const response = await fetch("/api/v1/instances");
+      const connections = await response.json();
+
+      const select = document.getElementById("connection-select");
+      // Clear existing options except the first one
+      select.innerHTML = '<option value="">Select a database connection...</option>';
+
+      connections.forEach((connection) => {
+        const option = document.createElement("option");
+        option.value = connection.id;
+        option.textContent = `${connection.name} (${connection.db_type})`;
+        select.appendChild(option);
+      });
+
+      // Enable schema preview button when connection is selected
+      select.addEventListener("change", function () {
+        const previewBtn = document.getElementById("preview-schema");
+        previewBtn.disabled = !this.value;
+      });
+    } catch (error) {
+      console.error("Failed to load database connections:", error);
+      alert("Failed to load database connections. Please try again.");
+    }
+  }
+
+  // Preview schema for selected connection
+  async function previewSchema() {
+    const connectionId = document.getElementById("connection-select").value;
+    if (!connectionId) return;
+
+    try {
+      const response = await fetch(`/api/v1/instances/${connectionId}/schema`);
+      const data = await response.json();
+
+      if (data.status === "ok") {
+        renderSchemaAsTable(data.schema);
+        document.getElementById("schema-preview").classList.remove("hidden");
+      } else {
+        alert("Failed to get schema: " + (data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Failed to preview schema:", error);
+      alert("Failed to preview schema. Please try again.");
+    }
+  }
+
+  // Render schema as beautiful tables
+  function renderSchemaAsTable(schema) {
+    const container = document.getElementById("schema-content");
+    container.innerHTML = "";
+
+    if (!schema || !schema.tables) {
+      container.innerHTML = '<p class="text-gray-500 text-sm">No schema data available</p>';
+      return;
+    }
+
+    Object.entries(schema.tables).forEach(([tableName, tableData]) => {
+      // Create table container
+      const tableContainer = document.createElement("div");
+      tableContainer.className = "bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden";
+
+      // Table header
+      const tableHeader = document.createElement("div");
+      tableHeader.className = "bg-blue-50 px-4 py-3 border-b border-gray-200";
+      tableHeader.innerHTML = `
+        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+          <i class="fas fa-table text-blue-600 mr-2"></i>
+          ${tableName}
+        </h3>
+      `;
+
+      // Create table
+      const table = document.createElement("table");
+      table.className = "min-w-full divide-y divide-gray-200";
+
+      // Table head
+      const thead = document.createElement("thead");
+      thead.className = "bg-gray-50";
+      thead.innerHTML = `
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+        </tr>
+      `;
+
+      // Table body
+      const tbody = document.createElement("tbody");
+      tbody.className = "bg-white divide-y divide-gray-200";
+
+      if (tableData.columns && Array.isArray(tableData.columns)) {
+        tableData.columns.forEach((column, index) => {
+          const row = document.createElement("tr");
+          row.className = index % 2 === 0 ? "bg-white" : "bg-gray-50";
+
+          // Handle different column data structures
+          let columnName, columnType;
+
+          if (typeof column === "string") {
+            // Column is a simple string
+            columnName = column;
+            columnType = tableData.types && tableData.types[column] ? tableData.types[column] : "unknown";
+          } else if (typeof column === "object" && column !== null) {
+            // Column is an object - extract name and type
+            columnName = column.name || column.column_name || column.Field || Object.keys(column)[0] || "unknown";
+            columnType =
+              column.type ||
+              column.data_type ||
+              column.Type ||
+              column.dataType ||
+              (tableData.types && tableData.types[columnName]) ||
+              "unknown";
+          } else {
+            columnName = "unknown";
+            columnType = "unknown";
+          }
+
+          row.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <i class="fas fa-columns text-gray-400 mr-2"></i>
+              ${columnName}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                ${columnType}
+              </span>
+            </td>
+          `;
+
+          tbody.appendChild(row);
+        });
+      } else {
+        // Fallback if columns structure is different
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td colspan="2" class="px-6 py-4 text-sm text-gray-500 text-center">
+            No column information available
+          </td>
+        `;
+        tbody.appendChild(row);
+      }
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+
+      tableContainer.appendChild(tableHeader);
+      tableContainer.appendChild(table);
+      container.appendChild(tableContainer);
+    });
+
+    // Add summary info
+    const summaryDiv = document.createElement("div");
+    summaryDiv.className = "mt-4 p-3 bg-blue-50 rounded-md border border-blue-200";
+    summaryDiv.innerHTML = `
+      <div class="flex items-center text-sm text-blue-800">
+        <i class="fas fa-info-circle mr-2"></i>
+        <span>Schema contains <strong>${Object.keys(schema.tables).length}</strong> table(s)</span>
+      </div>
+    `;
+    container.appendChild(summaryDiv);
+  }
+
+  // Set default schema for demo purposes
+  document.addEventListener("DOMContentLoaded", function () {
+    const defaultSchema = {
+      tables: {
+        users: {
+          columns: ["id", "name", "email", "age", "status", "created_at"],
+          types: {
+            id: "int",
+            name: "varchar",
+            email: "varchar",
+            age: "int",
+            status: "varchar",
+            created_at: "timestamp",
+          },
+        },
+        orders: {
+          columns: ["id", "user_id", "product_id", "quantity", "price", "created_at"],
+          types: {
+            id: "int",
+            user_id: "int",
+            product_id: "int",
+            quantity: "int",
+            price: "decimal",
+            created_at: "timestamp",
+          },
+        },
+        products: {
+          columns: ["id", "name", "price", "category", "created_at"],
+          types: {
+            id: "int",
+            name: "varchar",
+            price: "decimal",
+            category: "varchar",
+            created_at: "timestamp",
+          },
+        },
+      },
+    };
+
+    const schemaTextarea = document.querySelector('textarea[name="schema"]');
+    if (schemaTextarea && !schemaTextarea.value.trim()) {
+      schemaTextarea.value = JSON.stringify(defaultSchema, null, 2);
+    }
+  });
+</script>
+{% endblock %}
