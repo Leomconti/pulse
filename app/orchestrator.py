@@ -1,74 +1,24 @@
 import asyncio
-import importlib
-import inspect
 import json
-from collections.abc import Awaitable, Callable
-from typing import Optional, Union
+from typing import Optional
 
 import logfire
 
+from app.agents import composer_agent, mapper_agent, planner_agent, validator_agent
 from app.models import Context, WorkflowStatus
 from app.services.redis import redis
 
 
 class WorkflowOrchestrator:
     """
-    DAG-based workflow orchestrator for agentic workflows.
+    Simplified workflow orchestrator for agentic workflows.
 
-    Manages the execution of agent nodes in a directed acyclic graph,
-    handles dependencies, supports feedback loops, and persists state to Redis.
+    Executes agents in a linear sequence: planner -> mapper -> composer -> validator
+    with retry logic on composer -> validator if validation fails.
     """
 
     def __init__(self):
         self.redis_client = redis
-
-        # Define the workflow DAG - adjacency list representation
-        self.workflow_dag = {
-            "planner": ["mapper"],
-            "mapper": ["composer"],
-            "composer": ["validator"],
-            "validator": [],  # End node
-        }
-
-        # Agent registry - maps agent names to their functions (sync or async)
-        self.agents: dict[str, Union[Callable[[Context], Context], Callable[[Context], Awaitable[Context]]]] = {}
-        self._register_agents()
-
-    def _register_agents(self):
-        """Register all agent functions from the agents module."""
-        agent_modules = {
-            "planner": "app.agents.planner",
-            "mapper": "app.agents.mapper",
-            "composer": "app.agents.composer",
-            "validator": "app.agents.validator",
-        }
-
-        for agent_name, module_path in agent_modules.items():
-            try:
-                module = importlib.import_module(module_path)
-                agent_func = getattr(module, f"{agent_name}_agent")
-                self.agents[agent_name] = agent_func
-            except (ImportError, AttributeError) as e:
-                logfire.info(f"Warning: Could not register agent {agent_name}: {e}")
-
-    def get_agent_requirements(self, agent_name: str) -> list[str]:
-        """Get the requirements for a specific agent."""
-        try:
-            module_path = f"app.agents.{agent_name}"
-            module = importlib.import_module(module_path)
-            return getattr(module, "requires", [])
-        except (ImportError, AttributeError):
-            return []
-
-    def check_requirements(self, ctx: Context, agent_name: str) -> bool:
-        """Check if all requirements for an agent are satisfied."""
-        requirements = self.get_agent_requirements(agent_name)
-
-        for req in requirements:
-            if not hasattr(ctx, req) or getattr(ctx, req) is None:
-                return False
-
-        return True
 
     async def save_context(self, ctx: Context):
         """Save context to Redis."""
@@ -89,32 +39,11 @@ class WorkflowOrchestrator:
             return Context.from_dict(json.loads(data_str))
         return None
 
-    async def execute_agent(self, ctx: Context, agent_name: str) -> Context:
-        """Execute a single agent."""
-        if agent_name not in self.agents:
-            raise ValueError(f"Agent {agent_name} not found")
-
-        # Check requirements
-        if not self.check_requirements(ctx, agent_name):
-            missing_reqs = [
-                req
-                for req in self.get_agent_requirements(agent_name)
-                if not hasattr(ctx, req) or getattr(ctx, req) is None
-            ]
-            raise ValueError(f"Missing requirements for {agent_name}: {missing_reqs}")
-
-        # Add sleep to simulate processing time for better UX
+    async def execute_agent_with_delay(self, agent_func, ctx: Context, agent_name: str) -> Context:
+        """Execute an agent with simulated processing delay for better UX."""
         logfire.info(f"Starting {agent_name} agent processing...")
-        await asyncio.sleep(2)  # 2 second delay for each agent
 
-        # Execute the agent (handle both sync and async functions)
-        agent_func = self.agents[agent_name]
-
-        # Check if the agent function is async
-        if inspect.iscoroutinefunction(agent_func):
-            updated_ctx = await agent_func(ctx)
-        else:
-            updated_ctx = agent_func(ctx)
+        updated_ctx = await agent_func(ctx)
 
         # Ensure we have a Context object
         if not isinstance(updated_ctx, Context):
@@ -122,6 +51,7 @@ class WorkflowOrchestrator:
 
         # Save context after each step
         await self.save_context(updated_ctx)
+        logfire.info(f"Completed {agent_name} agent")
 
         return updated_ctx
 
@@ -136,48 +66,48 @@ class WorkflowOrchestrator:
 
         return validation_failed and under_retry_limit
 
-    def get_retry_path(self) -> list[str]:
-        """Get the path of agents to re-execute during retry (composer -> validator)."""
-        return ["composer", "validator"]
-
     async def execute_workflow(self, ctx: Context) -> Context:
         """
-        Execute the complete workflow.
-
-        Follows the DAG, handles dependencies, supports feedback loops,
-        and persists state at each step.
+        Execute the complete workflow: planner -> mapper -> composer -> validator
+        with retry logic on composer -> validator if validation fails.
         """
-
         # Set initial status
         ctx.status = WorkflowStatus.RUNNING
         await self.save_context(ctx)
 
         try:
-            # Execute the main workflow path
-            execution_order = self._get_execution_order()
+            # Execute main workflow sequence
+            logfire.info("Starting workflow execution")
 
-            for agent_name in execution_order:
-                logfire.info(f"Executing agent: {agent_name}")
-                ctx.current_step = agent_name
-                await self.save_context(ctx)
-                ctx = await self.execute_agent(ctx, agent_name)
-                logfire.info(f"Completed agent: {agent_name}")
+            # Step 1: Planner
+            ctx.current_step = "planner"
+            ctx = await self.execute_agent_with_delay(planner_agent, ctx, "planner")
 
-            # Handle feedback loop if validation failed
+            # Step 2: Mapper
+            ctx.current_step = "mapper"
+            ctx = await self.execute_agent_with_delay(mapper_agent, ctx, "mapper")
+
+            # Step 3: Composer
+            ctx.current_step = "composer"
+            ctx = await self.execute_agent_with_delay(composer_agent, ctx, "composer")
+
+            # Step 4: Validator
+            ctx.current_step = "validator"
+            ctx = await self.execute_agent_with_delay(validator_agent, ctx, "validator")
+
+            # Handle retry loop if validation failed
             while self.should_retry(ctx):
                 logfire.info(f"Validation failed, retrying... (attempt {ctx.retry_count + 1})")
                 ctx.retry_count += 1
                 ctx.status = WorkflowStatus.RETRYING
                 await self.save_context(ctx)
 
-                # Execute only the retry path (composer -> validator)
-                retry_path = self.get_retry_path()
-                for agent_name in retry_path:
-                    logfire.info(f"Re-executing agent: {agent_name}")
-                    ctx.current_step = agent_name
-                    await self.save_context(ctx)
-                    ctx = await self.execute_agent(ctx, agent_name)
-                    logfire.info(f"Re-completed agent: {agent_name}")
+                # Re-execute composer and validator
+                ctx.current_step = "composer"
+                ctx = await self.execute_agent_with_delay(composer_agent, ctx, "composer")
+
+                ctx.current_step = "validator"
+                ctx = await self.execute_agent_with_delay(validator_agent, ctx, "validator")
 
             # Set final status
             if ctx.validator_output and ctx.validator_output.validation.is_valid:
@@ -188,7 +118,7 @@ class WorkflowOrchestrator:
                 logfire.info("Workflow failed after maximum retries")
 
         except Exception as e:
-            logfire.info(f"Workflow execution error: {e}")
+            logfire.error(f"Workflow execution error: {e}")
             ctx.status = WorkflowStatus.FAILED
             ctx.feedback = f"Execution error: {str(e)}"
 
@@ -198,12 +128,6 @@ class WorkflowOrchestrator:
             await self.save_context(ctx)
 
         return ctx
-
-    def _get_execution_order(self) -> list[str]:
-        """Get the topological order of agent execution."""
-        # For this simple DAG, we can use a fixed order
-        # In a more complex scenario, you'd implement topological sorting
-        return ["planner", "mapper", "composer", "validator"]
 
     async def get_workflow_status(self, request_id: str) -> Optional[dict]:
         """Get the current status of a workflow."""
