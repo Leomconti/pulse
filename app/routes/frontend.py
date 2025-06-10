@@ -22,7 +22,16 @@ def timestamp_to_date(timestamp: float) -> str:
         return "Invalid date"
 
 
+# Add pluralize filter for proper pluralization
+def pluralize_filter(count: int, singular: str = "", plural: str = "s") -> str:
+    """Add 's' for pluralization or custom singular/plural forms."""
+    if count == 1:
+        return singular
+    return plural
+
+
 templates.env.filters["timestamp_to_date"] = timestamp_to_date
+templates.env.filters["pluralize"] = pluralize_filter
 
 
 @router.get("/", response_class=HTMLResponse)

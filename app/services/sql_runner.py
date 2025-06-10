@@ -114,6 +114,45 @@ async def _execute_generic_query(connection: DatabaseConnection, sql: str) -> Qu
         raise SQLExecutionError(f"Unexpected error: {str(e)}")
 
 
+def _translate_sql_for_sqlite(sql: str) -> str:
+    """
+    Translate common MySQL/PostgreSQL SQL commands to SQLite equivalents.
+
+    Args:
+        sql: The original SQL query
+
+    Returns:
+        Translated SQL query for SQLite
+    """
+    sql_upper = sql.upper().strip()
+
+    # Handle SHOW TABLES
+    if sql_upper == "SHOW TABLES;" or sql_upper == "SHOW TABLES":
+        return "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+
+    # Handle SHOW DATABASES (not really applicable to SQLite, but provide something useful)
+    if sql_upper == "SHOW DATABASES;" or sql_upper == "SHOW DATABASES":
+        return "SELECT 'main' as database_name;"
+
+    # Handle DESC or DESCRIBE table
+    if sql_upper.startswith("DESC ") or sql_upper.startswith("DESCRIBE "):
+        # Extract table name
+        parts = sql.split()
+        if len(parts) >= 2:
+            table_name = parts[1].strip(";")
+            return f"PRAGMA table_info({table_name});"
+
+    # Handle SHOW COLUMNS FROM table
+    if sql_upper.startswith("SHOW COLUMNS FROM "):
+        parts = sql.split()
+        if len(parts) >= 4:
+            table_name = parts[3].strip(";")
+            return f"PRAGMA table_info({table_name});"
+
+    # Return original SQL if no translation needed
+    return sql
+
+
 async def run_sql_query(connection_id: str, sql: str) -> QueryResult:
     """
     Execute a SQL query on the specified database connection.
@@ -139,6 +178,10 @@ async def run_sql_query(connection_id: str, sql: str) -> QueryResult:
     sql = sql.strip()
     if not sql:
         raise SQLExecutionError("SQL query cannot be empty")
+
+    # Translate SQL for SQLite if needed
+    if connection.db_type.value == "sqlite":
+        sql = _translate_sql_for_sqlite(sql)
 
     # Use PostgreSQL-specific implementation for better performance
     if connection.db_type.value == "postgresql":
