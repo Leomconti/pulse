@@ -4,6 +4,7 @@ import logfire
 from fastapi import FastAPI
 
 from app.config import database_config, logfire_config
+from app.llm_clients.openai_client import openai_client
 from app.routes.frontend import router as frontend_router
 
 # Import routers
@@ -43,3 +44,4 @@ app.include_router(mock_data_router, prefix="/api/v1", tags=["mock-data"])
 
 logfire.configure(token=logfire_config.LOGFIRE_TOKEN, environment="local")
 logfire.instrument_fastapi(app)
+logfire.instrument_openai(openai_client.client)

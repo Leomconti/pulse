@@ -30,3 +30,10 @@ class LogfireConfig(BaseSettings):
 
 
 logfire_config = LogfireConfig()  # type: ignore
+
+
+class LLMConfig(BaseSettings):
+    OPENAI_API_KEY: str
+
+
+llm_config = LLMConfig()  # type: ignore

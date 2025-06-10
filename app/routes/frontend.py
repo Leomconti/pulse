@@ -182,7 +182,7 @@ async def create_mock_data_ui(request: Request):
         # Import and call the mock data creation
         from app.routes.mock_data import create_mock_databases
 
-        result = await create_mock_databases()
+        await create_mock_databases()
 
         # Get updated connections
         connections = await list_data(DatabaseConnection)
@@ -206,7 +206,7 @@ async def cleanup_mock_data_ui(request: Request):
         # Import and call the mock data cleanup
         from app.routes.mock_data import cleanup_mock_databases
 
-        result = await cleanup_mock_databases()
+        await cleanup_mock_databases()
 
         # Get updated connections
         connections = await list_data(DatabaseConnection)
@@ -228,21 +228,16 @@ async def cleanup_mock_data_ui(request: Request):
 async def create_mock_data_universal(request: Request):
     """Universal mock data creation endpoint that triggers custom events."""
     try:
-        print("DEBUG: Create mock data endpoint called")
-        # Import and call the mock data creation
         from app.routes.mock_data import create_mock_databases
 
-        result = await create_mock_databases()
-        print(f"DEBUG: Mock data creation result: {result}")
+        await create_mock_databases()
 
         # Return response with custom event trigger
         response = templates.TemplateResponse("partials/empty.html", {"request": request})
         response.headers["HX-Trigger"] = "mockDataCreated"
-        print("DEBUG: Returning response with HX-Trigger: mockDataCreated")
         return response
 
     except Exception as e:
-        print(f"DEBUG: Error creating mock data: {e}")
         response = templates.TemplateResponse("partials/empty.html", {"request": request})
         response.headers["HX-Trigger"] = f"mockDataError:{str(e)}"
         return response
@@ -255,7 +250,7 @@ async def cleanup_mock_data_universal(request: Request):
         # Import and call the mock data cleanup
         from app.routes.mock_data import cleanup_mock_databases
 
-        result = await cleanup_mock_databases()
+        await cleanup_mock_databases()
 
         # Return response with custom event trigger
         response = templates.TemplateResponse("partials/empty.html", {"request": request})

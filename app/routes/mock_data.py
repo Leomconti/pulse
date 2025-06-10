@@ -1,6 +1,7 @@
 import sqlite3
 from pathlib import Path
 
+import logfire
 from app.models import DatabaseConnection, DatabaseConnectionResponse, DatabaseType
 from app.services.redis_ops import delete_data, list_data, save_data
 from fastapi import APIRouter, HTTPException
@@ -230,7 +231,7 @@ async def cleanup_mock_databases():
                         db_path.unlink()
                         cleaned_files.append(str(db_path))
                     except Exception as e:
-                        print(f"Warning: Could not delete {db_path}: {e}")
+                        logfire.warning(f"Warning: Could not delete {db_path}: {e}")
 
         # Clean up empty mock_data directory
         mock_data_dir = Path("mock_data")
