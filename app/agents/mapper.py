@@ -1,4 +1,7 @@
-from app.models import Context, MappedAggregation, MappedEntity, MappedFilter, MapperOutput
+import json
+
+from app.llm_clients.openai_client import openai_client
+from app.models import Context, MapperOutput
 
 # Agent dependency requirements
 requires: list[str] = ["planner_output"]
@@ -15,82 +18,50 @@ async def mapper_agent(ctx: Context) -> Context:
     if not ctx.planner_output:
         raise ValueError("Planner output is required but not found in context")
 
-    # Get schema and planner output
-    schema = ctx.schema
-    planner_output = ctx.planner_output
+    # Build system prompt for the mapper
+    system_prompt = f"""You are a database schema mapper that takes structured query components and maps them to specific database tables and columns.
 
-    # Map entities to database tables and columns
-    mapped_entities = []
-    for entity in planner_output.entities:
-        # Mock mapping logic - in real scenario, this would use schema analysis
-        if entity.name.lower() == "users":
-            mapped_entities.append(
-                MappedEntity(
-                    entity_name=entity.name, table="users", column=None if entity.type == "table" else "user_id"
-                )
-            )
-        elif entity.name.lower() == "orders":
-            mapped_entities.append(
-                MappedEntity(
-                    entity_name=entity.name, table="orders", column=None if entity.type == "table" else "order_id"
-                )
-            )
-        elif entity.name.lower() == "products":
-            mapped_entities.append(
-                MappedEntity(
-                    entity_name=entity.name, table="products", column=None if entity.type == "table" else "product_id"
-                )
-            )
+Your task is to map the planner's structured output to the actual database schema:
+1. Map entities to specific database tables and columns
+2. Map filters to the correct database columns with proper table prefixes
+3. Map aggregations to the correct database columns with proper table prefixes
+4. Map order_by to the correct database column with proper table prefix
 
-    # Map filters to database columns
-    mapped_filters = []
-    for filter_obj in planner_output.filters:
-        # Mock column mapping
-        mapped_column = filter_obj.column
-        if filter_obj.column == "status" and any(e.table == "users" for e in mapped_entities):
-            mapped_column = "users.status"
-        elif filter_obj.column == "age" and any(e.table == "users" for e in mapped_entities):
-            mapped_column = "users.age"
+Available database schema:
+{json.dumps(ctx.schema, indent=2)}
 
-        mapped_filters.append(MappedFilter(filter=filter_obj, mapped_column=mapped_column))
+Mapping Rules:
+- For entities of type "table", set column to None and map to the actual table name
+- For entities of type "column", map to the specific table.column combination
+- For filters, map column names to their full table.column format
+- For aggregations, map column names to their full table.column format (use "*" for COUNT(*))
+- For order_by, map to the full table.column format
+- Use the exact table and column names from the schema
+- If a mapping is ambiguous, choose the most relevant table based on the query context
+"""
 
-    # Map aggregations to database columns
-    mapped_aggregations = []
-    for agg in planner_output.aggregations:
-        # Mock column mapping for aggregations
-        mapped_column = agg.column
-        if agg.column == "*":
-            mapped_column = "*"
-        elif agg.column == "price" and any(e.table == "products" for e in mapped_entities):
-            mapped_column = "products.price"
-        elif agg.column == "age" and any(e.table == "users" for e in mapped_entities):
-            mapped_column = "users.age"
+    # Build user prompt with planner output
+    user_prompt = f"""Map these planner components to the database schema:
 
-        mapped_aggregations.append(MappedAggregation(aggregation=agg, mapped_column=mapped_column))
+Original Query: "{ctx.query}"
 
-    # Map order_by column
-    mapped_order_by = None
-    if planner_output.order_by:
-        if planner_output.order_by == "name" and any(e.table == "users" for e in mapped_entities):
-            mapped_order_by = "users.name"
-        elif planner_output.order_by == "created_at":
-            # Find the main table to use for ordering
-            main_table = mapped_entities[0].table if mapped_entities else "users"
-            mapped_order_by = f"{main_table}.created_at"
-        else:
-            mapped_order_by = planner_output.order_by
+Planner Output:
+{json.dumps(ctx.planner_output.model_dump(), indent=2)}
 
-    # Create mapper output
-    mapper_output = MapperOutput(
-        mapped_entities=mapped_entities,
-        mapped_filters=mapped_filters,
-        mapped_aggregations=mapped_aggregations,
-        mapped_order_by=mapped_order_by,
-    )
+Map each component to the correct database tables and columns based on the provided schema."""
 
-    # Update context
-    ctx.mapper_output = mapper_output
-    ctx.current_step = "mapper"
-    ctx.update_timestamp()
+    try:
+        # Call OpenAI with structured output
+        mapper_output = await openai_client.call_structured(
+            model="gpt-4o-mini", system_prompt=system_prompt, user_prompt=user_prompt, output_model=MapperOutput
+        )
 
-    return ctx
+        # Update context
+        ctx.mapper_output = mapper_output
+        ctx.current_step = "mapper"
+        ctx.update_timestamp()
+
+        return ctx
+
+    except Exception as e:
+        raise ValueError(f"Mapper agent failed: {str(e)}")

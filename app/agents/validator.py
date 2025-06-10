@@ -1,4 +1,7 @@
-from app.models import Context, ValidationResult, ValidatorOutput
+import json
+
+from app.llm_clients.openai_client import openai_client
+from app.models import Context, ValidatorOutput
 
 # Agent dependency requirements
 requires: list[str] = ["composer_output"]
@@ -15,100 +18,62 @@ async def validator_agent(ctx: Context) -> Context:
     if not ctx.composer_output:
         raise ValueError("Composer output is required but not found in context")
 
-    sql_query = ctx.composer_output.sql_query
-    planner_output = ctx.planner_output
+    # Build system prompt for the validator
+    system_prompt = f"""You are a SQL query validator that ensures generated queries are correct, secure, and align with the original intent.
 
-    # Validation logic
-    errors = []
-    feedback = None
-    is_valid = True
-    query_output = None
+Your task is to validate the SQL query comprehensively:
+1. Syntax validation: Check for proper SQL syntax and structure
+2. Security validation: Check for SQL injection vulnerabilities
+3. Schema validation: Verify tables and columns exist in the schema
+4. Intent alignment: Ensure the query matches the original natural language request
+5. Logical validation: Check for logical errors and potential issues
 
-    # Basic SQL syntax validation
-    sql_lower = sql_query.lower().strip()
+Available database schema:
+{json.dumps(ctx.schema, indent=2)}
 
-    if not sql_lower.startswith("select"):
-        errors.append("Query must start with SELECT")
-        is_valid = False
+Validation Criteria:
+- SQL must be syntactically correct
+- All tables and columns must exist in the schema
+- No dangerous SQL patterns (DROP, DELETE without WHERE, etc.)
+- Query should match the original intent (SELECT vs AGGREGATE vs FILTER)
+- Aggregations should have proper GROUP BY when needed
+- JOINs should be correct when multiple tables are involved
+- Data types should be compatible in comparisons
 
-    if "from" not in sql_lower:
-        errors.append("Query must include FROM clause")
-        is_valid = False
+Provide detailed feedback if issues are found, including specific suggestions for fixes."""
 
-    # Check for SQL injection patterns (basic)
-    dangerous_patterns = [";--", "; --", "drop table", "delete from", "update set"]
-    for pattern in dangerous_patterns:
-        if pattern in sql_lower:
-            errors.append(f"Potentially dangerous SQL pattern detected: {pattern}")
-            is_valid = False
+    # Build user prompt with all context
+    user_prompt = f"""Validate this SQL query:
 
-    # Validate against original intent
-    if planner_output:
-        # Check if aggregations match intent
-        if planner_output.intent == "aggregate":
-            agg_functions = ["count(", "sum(", "avg(", "max(", "min("]
-            if not any(func in sql_lower for func in agg_functions):
-                errors.append("Query should include aggregation functions based on intent")
-                is_valid = False
+Original Query: "{ctx.query}"
 
-        # Check if filters are present when expected
-        if planner_output.filters and "where" not in sql_lower:
-            errors.append("Query should include WHERE clause for filters")
-            is_valid = False
+Planner Output:
+{json.dumps(ctx.planner_output.model_dump() if ctx.planner_output else {}, indent=2)}
 
-        # Check if LIMIT is present when specified
-        if planner_output.limit and "limit" not in sql_lower:
-            errors.append("Query should include LIMIT clause as requested")
-            is_valid = False
+Mapper Output:
+{json.dumps(ctx.mapper_output.model_dump() if ctx.mapper_output else {}, indent=2)}
 
-    # Mock query execution validation
+Generated SQL Query:
+{ctx.composer_output.sql_query}
+
+Perform comprehensive validation and provide detailed feedback if any issues are found."""
+
     try:
-        # In a real implementation, this would execute the query against the database
-        # For now, we'll simulate some basic execution results
-        if is_valid:
-            query_output = "Query executed successfully (mock result)"
-        else:
-            query_output = "Query validation failed"
+        # Call OpenAI with structured output
+        validator_output = await openai_client.call_structured(
+            model="gpt-4o-mini", system_prompt=system_prompt, user_prompt=user_prompt, output_model=ValidatorOutput
+        )
+
+        # Update context
+        ctx.validator_output = validator_output
+        ctx.current_step = "validator"
+        ctx.update_timestamp()
+
+        # If validation failed, set feedback for potential retry
+        if not validator_output.validation.is_valid:
+            ctx.feedback = validator_output.validation.feedback
+
+        return ctx
+
     except Exception as e:
-        errors.append(f"Query execution error: {str(e)}")
-        is_valid = False
-        query_output = f"Execution error: {str(e)}"
-
-    # Generate feedback for improvements
-    if not is_valid:
-        feedback_parts = []
-
-        if errors:
-            feedback_parts.append("Issues found:")
-            feedback_parts.extend([f"- {error}" for error in errors])
-
-        # Provide specific suggestions
-        if planner_output:
-            if planner_output.intent == "aggregate" and not any(
-                func in sql_lower for func in ["count(", "sum(", "avg("]
-            ):
-                feedback_parts.append("Suggestion: Add appropriate aggregation functions (COUNT, SUM, AVG)")
-
-            if planner_output.filters and "where" not in sql_lower:
-                feedback_parts.append("Suggestion: Add WHERE clause to apply filters")
-
-        feedback = "\n".join(feedback_parts)
-
-    # Create validation result
-    validation_result = ValidationResult(
-        is_valid=is_valid, errors=errors if errors else None, feedback=feedback, query_output=query_output
-    )
-
-    # Create validator output
-    validator_output = ValidatorOutput(validation=validation_result)
-
-    # Update context
-    ctx.validator_output = validator_output
-    ctx.current_step = "validator"
-    ctx.update_timestamp()
-
-    # If validation failed, set feedback for potential retry
-    if not is_valid:
-        ctx.feedback = feedback
-
-    return ctx
+        raise ValueError(f"Validator agent failed: {str(e)}")
