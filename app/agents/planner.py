@@ -39,7 +39,7 @@ Instructions:
 """
 
     # Build user prompt with the actual query
-    user_prompt = f"""Parse this natural language query about healthcare processes:
+    user_prompt = f"""Parse this natural language query:
 
 Query: "{ctx.query}"
 

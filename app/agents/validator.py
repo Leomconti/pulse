@@ -47,11 +47,7 @@ Provide detailed feedback if issues are found, including specific suggestions fo
 
 Original Query: "{ctx.query}"
 
-Planner Output:
-{json.dumps(ctx.planner_output.model_dump() if ctx.planner_output else {}, indent=2)}
-
-Mapper Output:
-{json.dumps(ctx.mapper_output.model_dump() if ctx.mapper_output else {}, indent=2)}
+Schema: {json.dumps(ctx.schema, indent=2)}
 
 Generated SQL Query:
 {ctx.composer_output.sql_query}

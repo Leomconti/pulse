@@ -1,6 +1,6 @@
 <div class="space-y-4">
   {% for step in steps %}
-  <div class="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+  <div class="flex items-start space-x-4 p-4 border border-gray-200 rounded-lg bg-gray-50" data-step-status="{{ step.status }}">
     <!-- Status Indicator -->
     <div class="flex-shrink-0 mt-1">
       {% if step.status == 'pending' %}
@@ -101,12 +101,29 @@
 
   <!-- Overall Status -->
   <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-    <div class="flex items-center">
-      <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-      <span class="text-sm font-medium text-blue-800">
-        Workflow Status: {% set completed_count = steps | selectattr("status", "equalto", "done") | list | length %} {%
-        set total_count = steps | length %} {{ completed_count }} of {{ total_count }} steps completed
-      </span>
+    <div class="flex items-center justify-between">
+      <div class="flex items-center">
+        <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+        <span class="text-sm font-medium text-blue-800">
+          Workflow Status: {% set completed_count = steps | selectattr("status", "equalto", "done") | list | length %} {%
+          set total_count = steps | length %} {{ completed_count }} of {{ total_count }} steps completed
+        </span>
+      </div>
+
+      {% set all_done = (steps | selectattr("status", "equalto", "done") | list | length) == (steps | length) %}
+      {% set has_failed = steps | selectattr("status", "equalto", "failed") | list | length > 0 %}
+
+      {% if all_done or has_failed %}
+      <div class="flex items-center text-xs text-gray-600">
+        <i class="fas fa-check-circle text-green-600 mr-1"></i>
+        <span>Complete - Auto-refresh stopped</span>
+      </div>
+      {% else %}
+      <div class="flex items-center text-xs text-gray-600">
+        <i class="fas fa-sync-alt fa-spin text-blue-600 mr-1"></i>
+        <span>Auto-refreshing every 2s</span>
+      </div>
+      {% endif %}
     </div>
   </div>
 
@@ -252,9 +269,9 @@
     if (finalResults || (steps.length > 0 && (completedSteps.length === steps.length || failedSteps.length > 0))) {
       // Workflow is completed, stop polling
       const stepsList = document.getElementById('steps-list');
-      if (stepsList && stepsList.parentElement) {
-        // Remove the hx-trigger attribute to stop polling
-        stepsList.parentElement.removeAttribute('hx-trigger');
+      if (stepsList) {
+        // Set data-polling to stopped to halt HTMX polling
+        stepsList.setAttribute('data-polling', 'stopped');
         console.log('Workflow completed - polling stopped');
       }
     }
