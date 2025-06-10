@@ -45,5 +45,5 @@ app.include_router(workflow_router, prefix="/api/v1", tags=["workflows"])
 
 
 logfire.configure(token=logfire_config.LOGFIRE_TOKEN, environment="local")
-logfire.instrument_fastapi(app)
+logfire.instrument_fastapi(app, excluded_urls=["/api/v1/workflows/*/steps-htmx"])
 logfire.instrument_openai(openai_client.client)
