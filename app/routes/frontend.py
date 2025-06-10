@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from app.models import DatabaseConnection, DatabaseConnectionCreate, DatabaseType
@@ -9,6 +10,19 @@ from fastapi.templating import Jinja2Templates
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+# Add custom filter to convert Unix timestamp to readable date
+def timestamp_to_date(timestamp: float) -> str:
+    """Convert Unix timestamp to readable date format."""
+    try:
+        dt = datetime.fromtimestamp(timestamp)
+        return dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError, OSError):
+        return "Invalid date"
+
+
+templates.env.filters["timestamp_to_date"] = timestamp_to_date
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -197,4 +211,91 @@ async def cleanup_mock_data_ui(request: Request):
         connections = await list_data(DatabaseConnection)
         return templates.TemplateResponse(
             "partials/connections_list.html", {"request": request, "connections": connections, "error": str(e)}
+        )
+
+
+# Universal mock data endpoints that work with HTMX events
+@router.post("/mock-data/create-universal")
+async def create_mock_data_universal(request: Request):
+    """Universal mock data creation endpoint that triggers custom events."""
+    try:
+        print("DEBUG: Create mock data endpoint called")
+        # Import and call the mock data creation
+        from app.routes.mock_data import create_mock_databases
+
+        result = await create_mock_databases()
+        print(f"DEBUG: Mock data creation result: {result}")
+
+        # Return response with custom event trigger
+        response = templates.TemplateResponse("partials/empty.html", {"request": request})
+        response.headers["HX-Trigger"] = "mockDataCreated"
+        print("DEBUG: Returning response with HX-Trigger: mockDataCreated")
+        return response
+
+    except Exception as e:
+        print(f"DEBUG: Error creating mock data: {e}")
+        response = templates.TemplateResponse("partials/empty.html", {"request": request})
+        response.headers["HX-Trigger"] = f"mockDataError:{str(e)}"
+        return response
+
+
+@router.delete("/mock-data/cleanup-universal")
+async def cleanup_mock_data_universal(request: Request):
+    """Universal mock data cleanup endpoint that triggers custom events."""
+    try:
+        # Import and call the mock data cleanup
+        from app.routes.mock_data import cleanup_mock_databases
+
+        result = await cleanup_mock_databases()
+
+        # Return response with custom event trigger
+        response = templates.TemplateResponse("partials/empty.html", {"request": request})
+        response.headers["HX-Trigger"] = "mockDataCleaned"
+        return response
+
+    except Exception as e:
+        response = templates.TemplateResponse("partials/empty.html", {"request": request})
+        response.headers["HX-Trigger"] = f"mockDataError:{str(e)}"
+        return response
+
+
+@router.get("/connections-list-partial", response_class=HTMLResponse)
+async def connections_list_partial(request: Request):
+    """Get just the connections list partial for refreshing."""
+    try:
+        connections = await list_data(DatabaseConnection)
+        return templates.TemplateResponse(
+            "partials/connections_list.html", {"request": request, "connections": connections}
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "partials/connections_list.html", {"request": request, "connections": [], "error": str(e)}
+        )
+
+
+@router.get("/dashboard-stats-partial", response_class=HTMLResponse)
+async def dashboard_stats_partial(request: Request):
+    """Get just the dashboard stats partial for refreshing."""
+    try:
+        connections = await list_data(DatabaseConnection)
+        return templates.TemplateResponse(
+            "partials/dashboard_stats.html", {"request": request, "connections": connections}
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "partials/dashboard_stats.html", {"request": request, "connections": [], "error": str(e)}
+        )
+
+
+@router.get("/dashboard-connections-partial", response_class=HTMLResponse)
+async def dashboard_connections_partial(request: Request):
+    """Get just the dashboard connections partial for refreshing."""
+    try:
+        connections = await list_data(DatabaseConnection)
+        return templates.TemplateResponse(
+            "partials/dashboard_connections.html", {"request": request, "connections": connections}
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "partials/dashboard_connections.html", {"request": request, "connections": [], "error": str(e)}
         )

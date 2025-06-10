@@ -1,4 +1,4 @@
-from datetime import datetime
+import time
 
 from app.models import (
     DatabaseConnection,
@@ -97,7 +97,7 @@ async def update_database_connection(connection_id: str, connection_update: Data
         update_data = connection_update.model_dump(exclude_unset=True)
         if update_data:
             # Update the timestamp
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = time.time()
 
             # Create updated connection
             updated_connection = existing_connection.model_copy(update=update_data)

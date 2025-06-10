@@ -1,9 +1,9 @@
-from datetime import datetime
+import time
 from enum import Enum
 from typing import Any, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class DatabaseType(str, Enum):
@@ -23,10 +23,10 @@ class DatabaseConnection(BaseModel):
     database: str = Field(..., min_length=1)
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: float = Field(default_factory=time.time)
+    updated_at: float = Field(default_factory=time.time)
 
-    @validator("port")
+    @field_validator("port")
     def validate_port(cls, v):
         if v <= 0 or v > 65535:
             raise ValueError("Port must be between 1 and 65535")
@@ -110,8 +110,8 @@ class DatabaseConnectionResponse(BaseModel):
     port: int
     database: str
     username: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: float
+    updated_at: float
 
     @classmethod
     def from_connection(cls, connection: DatabaseConnection) -> "DatabaseConnectionResponse":

@@ -77,18 +77,18 @@
           </div>
           <div class="flex items-center space-x-4">
             <button
-              hx-post="/mock-data/create-ui"
-              hx-target="#connections-list"
-              hx-swap="outerHTML"
+              hx-post="/mock-data/create-universal"
+              hx-target="body"
+              hx-swap="none"
               class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
               <i class="fas fa-plus mr-1"></i>
               Create Mock Data
             </button>
             <button
-              hx-post="/mock-data/cleanup-ui"
-              hx-target="#connections-list"
-              hx-swap="outerHTML"
+              hx-delete="/mock-data/cleanup-universal"
+              hx-target="body"
+              hx-swap="none"
               hx-confirm="Are you sure you want to delete all mock databases?"
               class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
@@ -161,7 +161,87 @@
 
       // Handle HTMX errors
       document.body.addEventListener("htmx:responseError", function (event) {
+        console.log("HTMX Response Error:", event);
         showToast("An error occurred. Please try again.", "error");
+      });
+
+      // Debug HTMX requests
+      document.body.addEventListener("htmx:afterRequest", function (event) {
+        console.log("HTMX Request completed:", event.detail.pathInfo.requestPath, "Status:", event.detail.xhr.status);
+        console.log("Response headers:", event.detail.xhr.getAllResponseHeaders());
+      });
+
+      // Listen for mock data events
+      document.body.addEventListener("mockDataCreated", function (event) {
+        console.log("Mock data created event triggered!");
+        showToast("Mock data created successfully!", "success");
+
+        // Refresh connections list if it exists (connections page)
+        const connectionsListElement = document.getElementById("connections-list");
+        if (connectionsListElement) {
+          console.log("Refreshing connections list...");
+          htmx.ajax("GET", "/connections-list-partial", {
+            target: "#connections-list",
+            swap: "outerHTML",
+          });
+        }
+
+        // Refresh dashboard stats if on dashboard
+        const dashboardStats = document.getElementById("dashboard-stats");
+        if (dashboardStats) {
+          console.log("Refreshing dashboard stats...");
+          htmx.ajax("GET", "/dashboard-stats-partial", {
+            target: "#dashboard-stats",
+            swap: "outerHTML",
+          });
+        }
+
+        // Refresh dashboard connections if on dashboard
+        const dashboardConnections = document.getElementById("dashboard-connections");
+        if (dashboardConnections) {
+          console.log("Refreshing dashboard connections...");
+          htmx.ajax("GET", "/dashboard-connections-partial", {
+            target: "#dashboard-connections",
+            swap: "outerHTML",
+          });
+        }
+      });
+
+      document.body.addEventListener("mockDataCleaned", function (event) {
+        showToast("Mock data cleaned up successfully!", "success");
+
+        // Refresh connections list if it exists (connections page)
+        const connectionsListElement = document.getElementById("connections-list");
+        if (connectionsListElement) {
+          htmx.ajax("GET", "/connections-list-partial", {
+            target: "#connections-list",
+            swap: "outerHTML",
+          });
+        }
+
+        // Refresh dashboard stats if on dashboard
+        const dashboardStats = document.getElementById("dashboard-stats");
+        if (dashboardStats) {
+          htmx.ajax("GET", "/dashboard-stats-partial", {
+            target: "#dashboard-stats",
+            swap: "outerHTML",
+          });
+        }
+
+        // Refresh dashboard connections if on dashboard
+        const dashboardConnections = document.getElementById("dashboard-connections");
+        if (dashboardConnections) {
+          htmx.ajax("GET", "/dashboard-connections-partial", {
+            target: "#dashboard-connections",
+            swap: "outerHTML",
+          });
+        }
+      });
+
+      // Listen for mock data errors
+      document.body.addEventListener("mockDataError", function (event) {
+        const errorMessage = event.detail ? event.detail.split(":")[1] : "An error occurred";
+        showToast(errorMessage || "Failed to process mock data", "error");
       });
     </script>
   </body>
