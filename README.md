@@ -25,6 +25,12 @@ A sophisticated "chat with database" API built with FastAPI, Redis, and multi-ag
 - **Real-time Status**: Track workflow progress with WebSocket-like updates
 - **State Persistence**: Complete workflow state stored in Redis with recovery capabilities
 
+
+<img width="1438" alt="image" src="https://github.com/user-attachments/assets/ed941df8-37d1-4696-b189-53b8663e22c0" />
+<img width="1438" alt="image" src="https://github.com/user-attachments/assets/69790253-5a25-4482-aa99-e2920a2ecb48" />
+<img width="1438" alt="image" src="https://github.com/user-attachments/assets/835972d9-2e71-4d06-bb6c-fbf09040b302" />
+
+
 ## 🏗️ Architecture
 
 ### Core Components
@@ -511,16 +517,4 @@ DatabaseConnection:{uuid} → JSON serialized connection data
 workflow:{request_id} → JSON serialized workflow context
 ```
 
-## 🤝 Contributing
-
-1. Follow the existing code patterns
-2. Add comprehensive error handling
-3. Update tests for new features
-4. Maintain type safety with Pydantic models
-5. Follow the project's async/await patterns
-6. Document agent dependencies and requirements
-7. Test workflow integrations end-to-end
-
-## 📄 License
-
-This project is licensed under the MIT License.
+PRIVATE PROJECT DONT COPY WITHOUT PERMISSION
