@@ -7,12 +7,14 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ui/use-toast'
 import { InstancesService } from '@/lib/instances'
 import type { DatabaseConnectionResponse, DatabaseConnectionCreate } from '@/types/connection'
+import { Badge } from '@/components/ui/badge'
 
 export function ConnectionsPage() {
   const [connections, setConnections] = useState<DatabaseConnectionResponse[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [dialogOpen, setDialogOpen] = useState<boolean>(false)
   const { toast } = useToast()
+  const [statusMap, setStatusMap] = useState<Record<string, 'idle' | 'loading' | 'ok' | 'error'>>({})
 
   const [form, setForm] = useState<DatabaseConnectionCreate>({
     name: '',
@@ -27,7 +29,12 @@ export function ConnectionsPage() {
   // Fetch connections on mount
   useEffect(() => {
     InstancesService.list()
-      .then(setConnections)
+      .then((data) => {
+        setConnections(data)
+        setStatusMap(
+          Object.fromEntries(data.map((c) => [c.id, 'idle'])) as Record<string, 'idle' | 'loading' | 'ok' | 'error'>
+        )
+      })
       .catch(() =>
         toast({
           title: 'Error',
@@ -51,12 +58,29 @@ export function ConnectionsPage() {
     try {
       const created = await InstancesService.create(form)
       setConnections((prev) => [...prev, created])
+      setStatusMap((prev) => ({ ...prev, [created.id]: 'idle' }))
       toast({ title: 'Success', description: 'Connection created successfully!' })
       setDialogOpen(false)
     } catch (error: any) {
       toast({
         title: 'Error',
         description: error?.response?.data?.detail ?? 'Failed to create connection.',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleTest = async (id: string) => {
+    setStatusMap((prev) => ({ ...prev, [id]: 'loading' }))
+    try {
+      const res = await InstancesService.test(id)
+      setStatusMap((prev) => ({ ...prev, [id]: res.status === 'ok' ? 'ok' : 'error' }))
+      toast({ title: res.status === 'ok' ? 'Connection ok' : 'Connection error', description: res.message })
+    } catch (e: any) {
+      setStatusMap((prev) => ({ ...prev, [id]: 'error' }))
+      toast({
+        title: 'Error',
+        description: e?.response?.data?.detail ?? 'Failed to test connection.',
         variant: 'destructive'
       })
     }
@@ -146,10 +170,26 @@ export function ConnectionsPage() {
                   <span className="font-medium">DB:</span> {conn.database}
                 </p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex items-center justify-between gap-2">
                 <Button size="sm" variant="secondary" asChild>
                   <a href={`/connections/${conn.id}`}>Details</a>
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => handleTest(conn.id)}>
+                  Test
+                </Button>
+                {statusMap[conn.id] && statusMap[conn.id] !== 'idle' && (
+                  <Badge
+                    variant={
+                      statusMap[conn.id] === 'ok'
+                        ? 'default'
+                        : statusMap[conn.id] === 'loading'
+                        ? 'secondary'
+                        : 'destructive'
+                    }
+                  >
+                    {statusMap[conn.id] === 'loading' ? 'Testing' : statusMap[conn.id] === 'ok' ? 'OK' : 'Error'}
+                  </Badge>
+                )}
               </CardFooter>
             </Card>
           ))}

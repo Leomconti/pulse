@@ -16,46 +16,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </NavLink>
               <div className="hidden md:flex space-x-6">
                 <NavLink
-                  to="/"
-                  className={({ isActive }) =>
-                    `text-sm transition-colors ${
-                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
-                    }`
-                  }
-                >
-                  Home
-                </NavLink>
-                <NavLink
-                  to="/docs"
-                  className={({ isActive }) =>
-                    `text-sm transition-colors ${
-                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
-                    }`
-                  }
-                >
-                  Docs
-                </NavLink>
-                <NavLink
-                  to="/examples"
-                  className={({ isActive }) =>
-                    `text-sm transition-colors ${
-                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
-                    }`
-                  }
-                >
-                  Examples
-                </NavLink>
-                <NavLink
-                  to="/landing"
-                  className={({ isActive }) =>
-                    `text-sm transition-colors ${
-                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
-                    }`
-                  }
-                >
-                  Landing
-                </NavLink>
-                <NavLink
                   to="/connections"
                   className={({ isActive }) =>
                     `text-sm transition-colors ${
@@ -64,6 +24,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   }
                 >
                   Connections
+                </NavLink>
+                <NavLink
+                  to="/query"
+                  className={({ isActive }) =>
+                    `text-sm transition-colors ${
+                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
+                    }`
+                  }
+                >
+                  Query
+                </NavLink>
+                <NavLink
+                  to="/workflow"
+                  className={({ isActive }) =>
+                    `text-sm transition-colors ${
+                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
+                    }`
+                  }
+                >
+                  Workflow
                 </NavLink>
               </div>
             </div>

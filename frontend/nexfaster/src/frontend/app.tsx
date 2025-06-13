@@ -1,17 +1,21 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
-import { Docs, Examples, Home, Layout } from '@/components/boilerplate'
+import { Layout } from '@/components/boilerplate'
 import { ConnectionsPage } from '@/components/connections'
 import NotFound from '@/app/not-found'
+import { ConnectionDetailsPage } from '@/components/connection-details'
+import { QueryRunnerPage } from '@/components/query-runner'
+import { WorkflowPage } from '@/components/workflow'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<ConnectionsPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
-          <Route path="/docs" element={<Docs />} />
-          <Route path="/examples" element={<Examples />} />
+          <Route path="/connections/:id" element={<ConnectionDetailsPage />} />
+          <Route path="/query" element={<QueryRunnerPage />} />
+          <Route path="/workflow" element={<WorkflowPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>
