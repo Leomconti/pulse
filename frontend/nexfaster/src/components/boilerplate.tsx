@@ -55,6 +55,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   Landing
                 </NavLink>
+                <NavLink
+                  to="/connections"
+                  className={({ isActive }) =>
+                    `text-sm transition-colors ${
+                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
+                    }`
+                  }
+                >
+                  Connections
+                </NavLink>
               </div>
             </div>
             <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import logfire
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import database_config, logfire_config
 from app.llm_clients.openai_client import openai_client
@@ -34,6 +35,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Pulse - Database Chat API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include routers
 app.include_router(frontend_router, prefix="", tags=["frontend"])
