@@ -23,3 +23,25 @@ export interface QueryResponseError {
 }
 
 export type QueryResponse = QueryResponseOk | QueryResponseError
+
+// Schema types
+export interface SchemaColumn {
+  name: string
+  type: string
+  nullable?: boolean
+  default?: string | null
+}
+
+export interface SchemaTable {
+  columns: SchemaColumn[]
+}
+
+export interface DatabaseSchema {
+  tables: Record<string, SchemaTable>
+}
+
+export interface SchemaResponse {
+  status: 'ok' | 'error'
+  schema?: DatabaseSchema
+  message?: string
+}

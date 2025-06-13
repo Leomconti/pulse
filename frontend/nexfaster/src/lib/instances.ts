@@ -1,5 +1,6 @@
 import { api } from '@/lib/api'
 import type { DatabaseConnectionResponse, DatabaseConnectionCreate } from '@/types/connection'
+import type { SchemaResponse } from '@/types/query'
 
 export const InstancesService = {
   async list(): Promise<DatabaseConnectionResponse[]> {
@@ -25,8 +26,8 @@ export const InstancesService = {
     const { data } = await api.post<{ status: string; message: string }>(`/instances/${id}/test`)
     return data
   },
-  async getSchema(id: string): Promise<{ status: string; schema: Record<string, unknown> }> {
-    const { data } = await api.get<{ status: string; schema: Record<string, unknown> }>(`/instances/${id}/schema`)
+  async getSchema(id: string): Promise<SchemaResponse> {
+    const { data } = await api.get<SchemaResponse>(`/instances/${id}/schema`)
     return data
   }
 }

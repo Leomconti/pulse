@@ -2,7 +2,6 @@ import { NavLink } from 'react-router'
 import { siteConfig } from '@/config/site.config'
 import ThemeToggler from '@/components/theme/toggler'
 import { Button } from '@/components/ui/button'
-import { GithubIcon } from 'lucide-react'
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -48,11 +47,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="rounded-full" asChild>
-                <a href={siteConfig.socials.github} target="_blank" rel="noopener noreferrer">
-                  <GithubIcon className="w-4 h-4" />
-                </a>
-              </Button>
               <ThemeToggler />
             </div>
           </div>

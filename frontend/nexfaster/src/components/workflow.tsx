@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { InstancesService } from '@/lib/instances'
 import { WorkflowService } from '@/lib/workflow'
 import type { DatabaseConnectionResponse } from '@/types/connection'
 import type { StepOutput } from '@/types/workflow'
+import type { DatabaseSchema } from '@/types/query'
 
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,10 +13,11 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useToast } from '@/components/ui/use-toast'
+import { Database, Columns, RefreshCw } from 'lucide-react'
 
 export function WorkflowPage() {
   type Mode = 'manual' | 'connection'
-  const [mode, setMode] = useState<Mode>('manual')
+  const [mode, setMode] = useState<Mode>('connection')
   const { toast } = useToast()
 
   // Form state
@@ -28,6 +30,10 @@ export function WorkflowPage() {
 
   const [loadingConnections, setLoadingConnections] = useState<boolean>(false)
   const [starting, setStarting] = useState<boolean>(false)
+
+  // Schema state
+  const [schema, setSchema] = useState<DatabaseSchema | null>(null)
+  const [loadingSchema, setLoadingSchema] = useState<boolean>(false)
 
   // Workflow state
   const [requestId, setRequestId] = useState<string | null>(null)
@@ -47,6 +53,43 @@ export function WorkflowPage() {
         .finally(() => setLoadingConnections(false))
     }
   }, [mode, toast])
+
+  const handleLoadSchema = useCallback(async () => {
+    if (!selectedConnection) {
+      return
+    }
+
+    setLoadingSchema(true)
+    try {
+      const response = await InstancesService.getSchema(selectedConnection)
+      if (response.status === 'ok' && response.schema) {
+        setSchema(response.schema)
+      } else {
+        toast({
+          title: 'Schema error',
+          description: response.message || 'Failed to load schema',
+          variant: 'destructive'
+        })
+      }
+    } catch (e: any) {
+      toast({
+        title: 'Error',
+        description: e?.message ?? 'Failed to load schema',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoadingSchema(false)
+    }
+  }, [selectedConnection, toast])
+
+  // Auto-load schema when connection changes
+  useEffect(() => {
+    if (mode === 'connection' && selectedConnection) {
+      handleLoadSchema()
+    } else {
+      setSchema(null)
+    }
+  }, [mode, selectedConnection, handleLoadSchema])
 
   const startWorkflow = async () => {
     if (!query.trim()) {
@@ -129,78 +172,142 @@ export function WorkflowPage() {
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">Agentic Workflow</h1>
 
-      {/* Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Start New Workflow</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Mode toggle */}
-          <div className="flex gap-2">
-            {(
-              [
-                { id: 'manual', label: 'Manual Schema' },
-                { id: 'connection', label: 'Database Connection' }
-              ] as const
-            ).map((tab) => (
-              <Button key={tab.id} variant={mode === tab.id ? 'default' : 'outline'} onClick={() => setMode(tab.id)}>
-                {tab.label}
-              </Button>
-            ))}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Form */}
+        <div className="lg:col-span-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Start New Workflow</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                {(
+                  [
+                    { id: 'connection', label: 'Database Connection' },
+                    { id: 'manual', label: 'Manual Schema' }
+                  ] as const
+                ).map((tab) => (
+                  <Button
+                    key={tab.id}
+                    variant={mode === tab.id ? 'default' : 'outline'}
+                    onClick={() => setMode(tab.id)}
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
 
-          {/* Query input */}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="workflow-query">Natural Language Query</Label>
-            <Input
-              id="workflow-query"
-              placeholder="e.g., count all active users where age > 18"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
+              {/* Query input */}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="workflow-query">Natural Language Query</Label>
+                <Input
+                  id="workflow-query"
+                  placeholder="e.g., count all active users where age > 18"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
 
-          {mode === 'manual' ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="schema-json">Database Schema (JSON)</Label>
-              <Textarea
-                id="schema-json"
-                rows={8}
-                value={schemaJson}
-                onChange={(e) => setSchemaJson(e.target.value)}
-                className="font-mono text-xs"
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 max-w-sm">
-              <Label htmlFor="workflow-connection">Database Connection</Label>
-              {loadingConnections ? (
-                <p>Loading connections...</p>
-              ) : connections.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No connections available</p>
+              {mode === 'manual' ? (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="schema-json">Database Schema (JSON)</Label>
+                  <Textarea
+                    id="schema-json"
+                    rows={8}
+                    value={schemaJson}
+                    onChange={(e) => setSchemaJson(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                </div>
               ) : (
-                <select
-                  id="workflow-connection"
-                  className="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
-                  value={selectedConnection}
-                  onChange={(e) => setSelectedConnection(e.target.value)}
-                >
-                  {connections.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.db_type})
-                    </option>
-                  ))}
-                </select>
+                <div className="flex flex-col gap-2 max-w-sm">
+                  <Label htmlFor="workflow-connection">Database Connection</Label>
+                  {loadingConnections ? (
+                    <p>Loading connections...</p>
+                  ) : connections.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No connections available</p>
+                  ) : (
+                    <select
+                      id="workflow-connection"
+                      className="rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm"
+                      value={selectedConnection}
+                      onChange={(e) => setSelectedConnection(e.target.value)}
+                    >
+                      {connections.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.db_type})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-        </CardContent>
-        <CardFooter>
-          <Button onClick={startWorkflow} disabled={starting}>
-            {starting ? 'Starting...' : 'Run Workflow'}
-          </Button>
-        </CardFooter>
-      </Card>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={startWorkflow} disabled={starting}>
+                {starting ? 'Starting...' : 'Run Workflow'}
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+
+        {/* Schema Preview Sidebar */}
+        {mode === 'connection' && (
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="w-5 h-5" />
+                  Schema Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingSchema ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="w-12 h-12 mx-auto text-muted-foreground mb-4 animate-spin" />
+                    <p className="text-sm text-muted-foreground">Loading schema...</p>
+                  </div>
+                ) : !selectedConnection ? (
+                  <div className="text-center py-8">
+                    <Database className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-sm text-muted-foreground">Select a connection to view schema</p>
+                  </div>
+                ) : schema ? (
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {Object.entries(schema.tables).map(([tableName, tableData]) => (
+                      <div key={tableName} className="border rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Database className="w-4 h-4 text-blue-600" />
+                          <h4 className="font-medium text-sm">{tableName}</h4>
+                        </div>
+                        <div className="space-y-1">
+                          {tableData.columns.map((column) => (
+                            <div key={column.name} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-1">
+                                <Columns className="w-3 h-3 text-gray-400" />
+                                <span className="font-mono">{column.name}</span>
+                              </div>
+                              <Badge variant="secondary" className="text-xs">
+                                {column.type}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="text-xs text-muted-foreground text-center pt-2 border-t">
+                      {Object.keys(schema.tables).length} table(s) found
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No schema data available</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
 
       {/* Workflow Panel */}
       {requestId && (

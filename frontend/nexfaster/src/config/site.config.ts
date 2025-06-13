@@ -1,25 +1,19 @@
-import { SiteConfig } from "@/types";
+import { SiteConfig } from '@/types'
 
 export const siteConfig: SiteConfig = {
-  name: "NexFaster",
-  title: "Next.js + React Router",
-  description: "A minimal template showcasing React Router integration within Next.js for client-side routing with clean documentation-style pages",
-  origin: "https://nexfaster.rdsx.dev",
-  keywords: [
-    "React Router",
-    "Next.js",
-    "Client-side routing",
-    "React",
-    "TypeScript",
-    "Template"
-  ],
-  og: "https://nexfaster.rdsx.dev/og.png",
+  name: 'Pulse',
+  title: 'Pulse – Healthcare Data Platform',
+  description:
+    'AI-powered monitoring and querying of healthcare databases. Connect, run agentic workflows and save lives.',
+  origin: 'https://leomconti.com.br',
+  keywords: ['React Router', 'Next.js', 'Client-side routing', 'React', 'TypeScript', 'Template'],
+  og: '/og.png',
   creator: {
-    name: "rds_agi",
-    url: "https://rdsx.dev",
+    name: 'Pulse Team',
+    url: 'https://leomconti.com.br'
   },
   socials: {
-    github: "https://github.com/rudrodip/nexfaster",
-    x: "https://x.com/rds_agi",
+    github: 'https://github.com/leomconti/pulse',
+    x: 'https://x.com/pulse_ai'
   }
 }
