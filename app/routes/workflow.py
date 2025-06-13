@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.orchestrator import execute_workflow, get_workflow_status
+from app.orchestrator import get_workflow_status
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -58,16 +58,97 @@ class StepOutput(BaseModel):
     finished_at: Optional[float] = None
 
 
+# ---------------------------------------------------------------------------
+# Workflow history
+# ---------------------------------------------------------------------------
+
+
+class WorkflowHistoryItem(BaseModel):
+    """Light-weight summary of a previously executed workflow."""
+
+    request_id: str
+    query: str
+    status: str  # pending, running, completed, failed, retrying
+    created_at: float
+    updated_at: float
+
+
+# NOTE: We are re-using the data stored by the orchestrator under
+# ``workflow:{request_id}`` keys.  No additional persistence layer is needed –
+# we simply enumerate those keys and read their JSON blobs.
+
+
+@router.get("/workflows/history", response_model=list[WorkflowHistoryItem])
+async def list_workflows_history():
+    """Return a list of all workflow runs stored in Redis (most recent first)."""
+
+    from app.orchestrator import create_orchestrator
+    from app.services.redis_ops import list_workflow_ids
+
+    orchestrator = create_orchestrator()
+
+    # Gather and load contexts
+    request_ids = await list_workflow_ids()
+
+    items: list[WorkflowHistoryItem] = []
+    for rid in request_ids:
+        ctx = await orchestrator.load_context(rid)
+        if not ctx:
+            continue  # race condition – key disappeared
+
+        items.append(
+            WorkflowHistoryItem(
+                request_id=str(ctx.request_id),
+                query=ctx.query,
+                status=ctx.status.value if hasattr(ctx, "status") else "unknown",
+                created_at=ctx.created_at,
+                updated_at=ctx.updated_at,
+            )
+        )
+
+    # Sort by creation time (descending)
+    items.sort(key=lambda x: x.created_at, reverse=True)
+
+    return items
+
+
 @router.post("/workflows")
 async def start_workflow(request: WorkflowRequest):
-    """Start a new workflow and return the request_id or HTML panel."""
-    try:
-        # Execute workflow asynchronously
-        ctx = await execute_workflow(query=request.query, schema=request.schema, user_id=request.user_id)
+    """Start a new workflow (API version) and immediately return the request_id.
 
-        # Check if this is an HTMX request
-        # For HTMX requests, return HTML
-        # For API requests, return JSON
+    Unlike the HTMX helpers, this endpoint is meant for programmatic access (e.g. the
+    NextJS frontend in `frontend/`).  We **must not** await the full execution of the
+    workflow here – doing so would block the response until all agents finish running
+    and would prevent the client from polling the `/steps` and `/status` endpoints in
+    real-time.
+
+    The strategy is therefore:
+      1. Create the initial Context.
+      2. Persist it to Redis so that the polling endpoints can immediately return a
+         "pending" workflow.
+      3. Spawn the long-running execution in the background with
+         `asyncio.create_task`.
+      4. Return the freshly generated `request_id` to the caller.
+    """
+
+    try:
+        # Lazily import heavy deps to keep module import fast
+        import asyncio
+
+        from app.models import Context
+        from app.orchestrator import create_orchestrator
+
+        # 1. Create the initial context
+        ctx = Context(query=request.query, schema=request.schema, user_id=request.user_id)
+
+        # 2. Persist immediately so that status/steps endpoints work right away
+        orchestrator = create_orchestrator()
+        await orchestrator.save_context(ctx)
+
+        # 3. Trigger background execution (fire-and-forget)
+        asyncio.create_task(orchestrator.execute_workflow(ctx))
+
+        # 4. Return the request id for the client to start polling
         return WorkflowResponse(request_id=str(ctx.request_id))
 
     except Exception as e:
