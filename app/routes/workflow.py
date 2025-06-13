@@ -58,6 +58,60 @@ class StepOutput(BaseModel):
     finished_at: Optional[float] = None
 
 
+# ---------------------------------------------------------------------------
+# Workflow history
+# ---------------------------------------------------------------------------
+
+
+class WorkflowHistoryItem(BaseModel):
+    """Light-weight summary of a previously executed workflow."""
+
+    request_id: str
+    query: str
+    status: str  # pending, running, completed, failed, retrying
+    created_at: float
+    updated_at: float
+
+
+# NOTE: We are re-using the data stored by the orchestrator under
+# ``workflow:{request_id}`` keys.  No additional persistence layer is needed –
+# we simply enumerate those keys and read their JSON blobs.
+
+
+@router.get("/workflows/history", response_model=list[WorkflowHistoryItem])
+async def list_workflows_history():
+    """Return a list of all workflow runs stored in Redis (most recent first)."""
+
+    from app.orchestrator import create_orchestrator
+    from app.services.redis_ops import list_workflow_ids
+
+    orchestrator = create_orchestrator()
+
+    # Gather and load contexts
+    request_ids = await list_workflow_ids()
+
+    items: list[WorkflowHistoryItem] = []
+    for rid in request_ids:
+        ctx = await orchestrator.load_context(rid)
+        if not ctx:
+            continue  # race condition – key disappeared
+
+        items.append(
+            WorkflowHistoryItem(
+                request_id=str(ctx.request_id),
+                query=ctx.query,
+                status=ctx.status.value if hasattr(ctx, "status") else "unknown",
+                created_at=ctx.created_at,
+                updated_at=ctx.updated_at,
+            )
+        )
+
+    # Sort by creation time (descending)
+    items.sort(key=lambda x: x.created_at, reverse=True)
+
+    return items
+
+
 @router.post("/workflows")
 async def start_workflow(request: WorkflowRequest):
     """Start a new workflow (API version) and immediately return the request_id.

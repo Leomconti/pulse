@@ -95,3 +95,32 @@ async def exists_data(id: str, model: type[BaseModel]) -> bool:
 
     result = await redis.exists(key)
     return bool(result)
+
+
+# ---------------------------------------------------------------------------
+# Workflow helpers
+# ---------------------------------------------------------------------------
+
+
+async def list_workflow_ids() -> list[str]:
+    """Return all workflow request IDs currently stored in Redis.
+
+    Workflows are stored by the orchestrator with keys formatted as
+    ``workflow:{request_id}``.  We scan for that pattern and return the raw
+    UUID portion.
+    """
+    redis = get_redis()
+    keys = await redis.keys("workflow:*")
+
+    ids: list[str] = []
+    for key in keys:
+        # Keys are returned as str thanks to decode_responses=True
+        if isinstance(key, bytes):
+            key = key.decode("utf-8")
+        # Expect pattern workflow:<id>
+        parts = key.split(":", 1)
+        if len(parts) == 2:
+            ids.append(parts[1])
+
+    # Sort newest first? leave ordering to caller
+    return ids

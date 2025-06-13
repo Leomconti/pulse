@@ -44,6 +44,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   Workflow
                 </NavLink>
+                <NavLink
+                  to="/workflow/history"
+                  className={({ isActive }) =>
+                    `text-sm transition-colors ${
+                      isActive ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'
+                    }`
+                  }
+                >
+                  History
+                </NavLink>
               </div>
             </div>
             <div className="flex items-center gap-2">

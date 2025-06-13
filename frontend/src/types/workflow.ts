@@ -22,3 +22,15 @@ export interface WorkflowStatusResponse {
   status: StepStatus | 'completed' | 'retrying' // backend can send completed, retrying
   current?: string | null
 }
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
+
+export interface WorkflowHistoryItem {
+  request_id: string
+  query: string
+  status: StepStatus | 'completed' | 'retrying'
+  created_at: number
+  updated_at: number
+}

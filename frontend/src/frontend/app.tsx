@@ -5,6 +5,7 @@ import NotFound from '@/app/not-found'
 import { ConnectionDetailsPage } from '@/components/connection-details'
 import { QueryRunnerPage } from '@/components/query-runner'
 import { WorkflowPage } from '@/components/workflow'
+import { WorkflowHistoryPage } from '@/components/workflow-history'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/connections/:id" element={<ConnectionDetailsPage />} />
           <Route path="/query" element={<QueryRunnerPage />} />
           <Route path="/workflow" element={<WorkflowPage />} />
+          <Route path="/workflow/history" element={<WorkflowHistoryPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Layout>

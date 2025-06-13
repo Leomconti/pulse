@@ -1,5 +1,11 @@
 import { api } from '@/lib/api'
-import type { WorkflowRequest, WorkflowResponse, StepOutput, WorkflowStatusResponse } from '@/types/workflow'
+import type {
+  WorkflowRequest,
+  WorkflowResponse,
+  StepOutput,
+  WorkflowStatusResponse,
+  WorkflowHistoryItem
+} from '@/types/workflow'
 import { InstancesService } from '@/lib/instances'
 
 export const WorkflowService = {
@@ -28,6 +34,11 @@ export const WorkflowService = {
 
   async getStatus(requestId: string): Promise<WorkflowStatusResponse> {
     const { data } = await api.get<WorkflowStatusResponse>(`/workflows/${requestId}/status`)
+    return data
+  },
+
+  async history(): Promise<WorkflowHistoryItem[]> {
+    const { data } = await api.get<WorkflowHistoryItem[]>('/workflows/history')
     return data
   }
 }
