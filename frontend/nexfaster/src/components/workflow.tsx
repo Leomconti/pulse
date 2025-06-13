@@ -104,7 +104,15 @@ export function WorkflowPage() {
           ? await WorkflowService.start({ query, schema: JSON.parse(schemaJson) })
           : await WorkflowService.startWithConnection(query, selectedConnection)
       setRequestId(resp.request_id)
-      setSteps([])
+
+      // Initialize steps with expected workflow steps
+      const initialSteps: StepOutput[] = [
+        { name: 'planner', status: 'pending', output: null },
+        { name: 'mapper', status: 'pending', output: null },
+        { name: 'composer', status: 'pending', output: null },
+        { name: 'validator', status: 'pending', output: null }
+      ]
+      setSteps(initialSteps)
       setPolling(true)
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message ?? 'Failed to start workflow', variant: 'destructive' })
@@ -113,22 +121,32 @@ export function WorkflowPage() {
     }
   }
 
-  // Poll steps
+  // Poll steps - more frequent polling for real-time updates
   useEffect(() => {
     if (!requestId || !polling) return
 
-    const interval = setInterval(async () => {
+    // Start polling immediately
+    const pollSteps = async () => {
       try {
         const newSteps = await WorkflowService.getSteps(requestId)
         setSteps(newSteps)
+
+        // Check if workflow is complete
         const allDone = newSteps.every((s) => s.status === 'done' || s.status === 'failed')
-        if (allDone) {
+        const hasRunning = newSteps.some((s) => s.status === 'running')
+
+        if (allDone && !hasRunning) {
           setPolling(false)
         }
       } catch (e) {
-        console.error(e)
+        console.error('Error polling steps:', e)
       }
-    }, 2000)
+    }
+
+    // Poll immediately, then every 1 second for more responsive updates
+    pollSteps()
+    const interval = setInterval(pollSteps, 1000)
+
     return () => clearInterval(interval)
   }, [requestId, polling])
 
@@ -141,10 +159,21 @@ export function WorkflowPage() {
         : step.status === 'failed'
         ? 'destructive'
         : 'outline'
+
+    const statusIcon =
+      step.status === 'done' ? '✅' : step.status === 'running' ? '🔄' : step.status === 'failed' ? '❌' : '⏳'
+
     return (
-      <Card key={step.name} className="border-border">
+      <Card
+        key={step.name}
+        className={`border-border ${step.status === 'running' ? 'ring-2 ring-blue-500 ring-opacity-50' : ''}`}
+      >
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg capitalize">{step.name} Agent</CardTitle>
+          <CardTitle className="text-lg capitalize flex items-center gap-2">
+            <span>{statusIcon}</span>
+            {step.name} Agent
+            {step.status === 'running' && <RefreshCw className="w-4 h-4 animate-spin" />}
+          </CardTitle>
           <Badge variant={statusVariant}>{step.status}</Badge>
         </CardHeader>
         {step.output && (
@@ -152,6 +181,14 @@ export function WorkflowPage() {
             <pre className="text-xs whitespace-pre-wrap font-mono text-muted-foreground">
               {JSON.stringify(step.output, null, 2)}
             </pre>
+          </CardContent>
+        )}
+        {step.status === 'running' && !step.output && (
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Processing...
+            </div>
           </CardContent>
         )}
       </Card>
@@ -311,17 +348,15 @@ export function WorkflowPage() {
 
       {/* Workflow Panel */}
       {requestId && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <h2 className="text-xl font-semibold">Workflow Progress</h2>
-          <ScrollArea className="h-[500px] w-full pr-4">
-            <div className="space-y-4">
-              {steps.length === 0 ? (
-                <p className="text-muted-foreground">Waiting for steps...</p>
-              ) : (
-                steps.map(renderStepCard)
-              )}
-            </div>
-          </ScrollArea>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {steps.length === 0 ? (
+              <p className="text-muted-foreground col-span-full">Initializing workflow...</p>
+            ) : (
+              steps.map(renderStepCard)
+            )}
+          </div>
         </div>
       )}
 
