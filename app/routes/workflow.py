@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from app.orchestrator import execute_workflow, get_workflow_status
+from app.orchestrator import get_workflow_status
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -60,14 +60,41 @@ class StepOutput(BaseModel):
 
 @router.post("/workflows")
 async def start_workflow(request: WorkflowRequest):
-    """Start a new workflow and return the request_id or HTML panel."""
-    try:
-        # Execute workflow asynchronously
-        ctx = await execute_workflow(query=request.query, schema=request.schema, user_id=request.user_id)
+    """Start a new workflow (API version) and immediately return the request_id.
 
-        # Check if this is an HTMX request
-        # For HTMX requests, return HTML
-        # For API requests, return JSON
+    Unlike the HTMX helpers, this endpoint is meant for programmatic access (e.g. the
+    NextJS frontend in `frontend/`).  We **must not** await the full execution of the
+    workflow here – doing so would block the response until all agents finish running
+    and would prevent the client from polling the `/steps` and `/status` endpoints in
+    real-time.
+
+    The strategy is therefore:
+      1. Create the initial Context.
+      2. Persist it to Redis so that the polling endpoints can immediately return a
+         "pending" workflow.
+      3. Spawn the long-running execution in the background with
+         `asyncio.create_task`.
+      4. Return the freshly generated `request_id` to the caller.
+    """
+
+    try:
+        # Lazily import heavy deps to keep module import fast
+        import asyncio
+
+        from app.models import Context
+        from app.orchestrator import create_orchestrator
+
+        # 1. Create the initial context
+        ctx = Context(query=request.query, schema=request.schema, user_id=request.user_id)
+
+        # 2. Persist immediately so that status/steps endpoints work right away
+        orchestrator = create_orchestrator()
+        await orchestrator.save_context(ctx)
+
+        # 3. Trigger background execution (fire-and-forget)
+        asyncio.create_task(orchestrator.execute_workflow(ctx))
+
+        # 4. Return the request id for the client to start polling
         return WorkflowResponse(request_id=str(ctx.request_id))
 
     except Exception as e:
